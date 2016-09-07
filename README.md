@@ -18,7 +18,8 @@ Backup script for Linux servers running a Minecraft server in a GNU Screen
 
 ## Installation
 1. Download the script: `$ wget https://raw.githubusercontent.com/nicolaschan/minecraft-backup/master/backup.sh`
-2. Configure the variables (in the top of the script)
+2. Mark as executable: `$ chmod +x backup.sh`
+3. Configure the variables (in the top of the script)
 
   ```bash
 SCREEN_NAME="PrivateSurvival" # Name of the GNU Screen your Minecraft server is running in
@@ -33,7 +34,7 @@ ENABLE_CHAT_MESSAGES=true # Tell players in Minecraft chat about backup status
 PREFIX="Backup" # Shows in the chat message
 DEBUG=true # Enable debug messages
   ```
-3. Create a cron job to automatically backup
+4. Create a cron job to automatically backup
 
   a. Edit the crontab: `$ crontab -e`
   
