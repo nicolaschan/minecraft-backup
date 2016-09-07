@@ -17,7 +17,7 @@ Backup script for Linux servers running Minecraft in a GNU Screen
 - Minecraft server (tested with Vanilla 1.10.2 only)
 
 ## Installation
-1. Download the script: `$ wget `
+1. Download the script: `$ wget https://raw.githubusercontent.com/nicolaschan/minecraft-backup/master/backup.sh`
 2. Configure the variables (in the top of the script)
 
   ```bash
