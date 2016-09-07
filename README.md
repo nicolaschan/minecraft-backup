@@ -1,5 +1,5 @@
 # Minecraft Backup
-Backup script for Linux servers running Minecraft in a GNU Screen
+Backup script for Linux servers running a Minecraft server in a GNU Screen
 
 ### Still in development, so use at your own risk!
 
