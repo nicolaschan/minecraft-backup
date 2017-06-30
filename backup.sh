@@ -3,7 +3,7 @@
 # Minecraft server automatic backup management script
 # by Nicolas Chan
 # MIT License
-# 
+#
 # For Minecraft servers running in a GNU screen.
 # For most convenience, run automatically with cron.
 
@@ -11,7 +11,7 @@
 SCREEN_NAME="PrivateSurvival" # Name of the GNU Screen your Minecraft server is running in
 SERVER_DIRECTORY="/home/server/MinecraftServers/PrivateSurvival" # Server directory, NOT the world; world is SERVER_DIRECTORY/world
 BACKUP_DIRECTORY="/media/server/ExternalStorage/Backups/PrivateSurvivalBackups" # Directory to save backups in
-NUMBER_OF_BACKUPS_TO_KEEP=128 # -1 indicates unlimited
+NUMBER_OF_BACKUPS_TO_KEEP=512 # -1 indicates unlimited
 DELETE_METHOD="thin" # Choices: thin, sequential, none; sequential: delete oldest; thin: keep last 24 hourly, last 30 daily, and monthly (use with 1 hr cron interval)
 COMPRESSION_ALGORITHM="zstd" # Leave empty for no compression
 COMPRESSION_FILE_EXTENSION=".zst" # Leave empty for no compression; Precede with a . (for example: ".gz")
@@ -30,14 +30,31 @@ ARCHIVE_PATH=$BACKUP_DIRECTORY/$ARCHIVE_FILE_NAME
 message-players () {
   local MESSAGE=$1
   local HOVER_MESSAGE=$2
-  echo "$MESSAGE ($HOVER_MESSAGE)"
-  if $ENABLE_CHAT_MESSAGES; then
-    screen -S $SCREEN_NAME -p 0 -X stuff "tellraw @a [\"\",{\"text\":\"[$PREFIX] \",\"color\":\"gray\",\"italic\":true},{\"text\":\"$MESSAGE\",\"color\":\"gray\",\"italic\":true,\"hoverEvent\":{\"action\":\"show_text\",\"value\":{\"text\":\"\",\"extra\":[{\"text\":\"$HOVER_MESSAGE\"}]}}}]$(printf \\r)"
-  fi
+  message-players-color "$MESSAGE" "$HOVER_MESSAGE" "gray"
 }
 execute-command () {
   local COMMAND=$1
   screen -S $SCREEN_NAME -p 0 -X stuff "$COMMAND$(printf \\r)"
+}
+message-players-error () {
+  local MESSAGE=$1
+  local HOVER_MESSAGE=$2
+  message-players-color "$MESSAGE" "$HOVER_MESSAGE" "red"
+}
+message-players-success () {
+  local MESSAGE=$1
+  local HOVER_MESSAGE=$2
+  message-players-color "$MESSAGE" "$HOVER_MESSAGE" "green"
+}
+message-players-color () {
+  local MESSAGE=$1
+  local HOVER_MESSAGE=$2
+  local COLOR=$3
+  echo "$MESSAGE ($HOVER_MESSAGE)"
+  if $ENABLE_CHAT_MESSAGES; then
+    sleep 0.5
+    screen -S $SCREEN_NAME -p 0 -X stuff "tellraw @a [\"\",{\"text\":\"[$PREFIX] \",\"color\":\"gray\",\"italic\":true},{\"text\":\"$MESSAGE\",\"color\":\"$COLOR\",\"italic\":true,\"hoverEvent\":{\"action\":\"show_text\",\"value\":{\"text\":\"\",\"extra\":[{\"text\":\"$HOVER_MESSAGE\"}]}}}]$(printf \\r)"
+  fi
 }
 
 # Notify players of start
@@ -55,12 +72,12 @@ delete-sequentially () {
 
 # Thinning delete method
 delete-thinning () {
-  local HOURLY_BLOCK_SIZE=24
+  local HOURLY_BLOCK_SIZE=96
   local DAILY_BLOCK_SIZE=30
   local BACKUPS=($(ls -r $BACKUP_DIRECTORY)) # List newest first
-  
+
   local OLDEST_HOURLY_BACKUP=${BACKUPS[HOURLY_BLOCK_SIZE - 1]}
-  local OLDEST_HOURLY_BACKUP_HOUR=${OLDEST_HOURLY_BACKUP:11:2}
+  local OLDEST_HOURLY_BACKUP_HOUR=${OLDEST_HOURLY_BACKUP:11:5}
 
   # DEBUG: Log the oldest hourly backup to console
   if $DEBUG; then
@@ -68,7 +85,7 @@ delete-thinning () {
   fi
 
   # If the oldest hourly backup was not at midnight, delete it
-  if [[ "$OLDEST_HOURLY_BACKUP_HOUR" -ne "00" ]] && [[ "$OLDEST_HOURLY_BACKUP" != "" ]]; then
+  if [ "$OLDEST_HOURLY_BACKUP_HOUR" != "00-00" ] && [[ "$OLDEST_HOURLY_BACKUP" != "" ]]; then
     rm $BACKUP_DIRECTORY/$OLDEST_HOURLY_BACKUP
     message-players "Deleted old backup" "$OLDEST_HOURLY_BACKUP"
   else
@@ -82,7 +99,7 @@ delete-thinning () {
     fi
 
     # If the oldest daily backup was not on the 1st, delete it
-    if [[ "$OLDEST_DAILY_BACKUP_DAY" -ne "01" ]] && [[ "$OLDEST_DAILY_BACKUP" != "" ]]; then
+    if [ "$OLDEST_DAILY_BACKUP_DAY" -ne 1 ] && [[ "$OLDEST_DAILY_BACKUP" != "" ]]; then
       rm $BACKUP_DIRECTORY/$OLDEST_DAILY_BACKUP
       message-players "Deleted old backup" "$OLDEST_DAILY_BACKUP"
     else
@@ -91,14 +108,6 @@ delete-thinning () {
     fi
   fi
 }
-
-# Delete old backups
-case $DELETE_METHOD in
-  "sequential") delete-sequentially
-    ;;
-  "thin") delete-thinning
-    ;;
-esac
 
 # Disable world autosaving
 execute-command "save-off"
@@ -122,6 +131,16 @@ execute-command "save-on"
 # Save the world
 execute-command "save-all"
 
+# Delete old backups
+delete-old-backups () {
+  case $DELETE_METHOD in
+    "sequential") delete-sequentially
+      ;;
+    "thin") delete-thinning
+      ;;
+  esac
+}
+
 # Notify players of completion
 WORLD_SIZE_KB=$(du --max-depth=0 $SERVER_DIRECTORY/world | awk '{print $1}')
 ARCHIVE_SIZE_KB=$(du $ARCHIVE_PATH | awk '{print $1}')
@@ -130,5 +149,9 @@ ARCHIVE_SIZE=$(du -h $ARCHIVE_PATH | awk '{print $1}')
 BACKUP_DIRECTORY_SIZE=$(du -h --max-depth=0 $BACKUP_DIRECTORY | awk '{print $1}')
 TIME_DELTA=$((END_TIME - START_TIME))
 
-message-players "Backup complete!" "$TIME_DELTA s, $ARCHIVE_SIZE/$BACKUP_DIRECTORY_SIZE, $COMPRESSION_PERCENT%"
-
+if [[ "$ARCHIVE_SIZE" != "" ]]; then
+  message-players-success "Backup complete!" "$TIME_DELTA s, $ARCHIVE_SIZE/$BACKUP_DIRECTORY_SIZE, $COMPRESSION_PERCENT%"
+  delete-old-backups
+else
+  message-players-error "Backup was not saved!" "Please notify an administrator"
+fi
