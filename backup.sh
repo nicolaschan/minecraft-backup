@@ -149,7 +149,8 @@ ARCHIVE_SIZE=$(du -h $ARCHIVE_PATH | awk '{print $1}')
 BACKUP_DIRECTORY_SIZE=$(du -h --max-depth=0 $BACKUP_DIRECTORY | awk '{print $1}')
 TIME_DELTA=$((END_TIME - START_TIME))
 
-if [[ "$ARCHIVE_SIZE" != "" && "$ARCHIVE_SIZE_KB" -gt "1024"]]; then
+# Check that archive size is not null and at least 1024 KB
+if [[ "$ARCHIVE_SIZE" != "" && "$ARCHIVE_SIZE_KB" -gt 1024 ]]; then
   message-players-success "Backup complete!" "$TIME_DELTA s, $ARCHIVE_SIZE/$BACKUP_DIRECTORY_SIZE, $COMPRESSION_PERCENT%"
   delete-old-backups
 else
