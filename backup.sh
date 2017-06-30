@@ -149,7 +149,7 @@ ARCHIVE_SIZE=$(du -h $ARCHIVE_PATH | awk '{print $1}')
 BACKUP_DIRECTORY_SIZE=$(du -h --max-depth=0 $BACKUP_DIRECTORY | awk '{print $1}')
 TIME_DELTA=$((END_TIME - START_TIME))
 
-if [[ "$ARCHIVE_SIZE" != "" ]]; then
+if [[ "$ARCHIVE_SIZE" != "" && "$ARCHIVE_SIZE_KB" -gt "1024"]]; then
   message-players-success "Backup complete!" "$TIME_DELTA s, $ARCHIVE_SIZE/$BACKUP_DIRECTORY_SIZE, $COMPRESSION_PERCENT%"
   delete-old-backups
 else
