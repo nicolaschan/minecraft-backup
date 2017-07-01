@@ -52,8 +52,7 @@ message-players-color () {
   local COLOR=$3
   echo "$MESSAGE ($HOVER_MESSAGE)"
   if $ENABLE_CHAT_MESSAGES; then
-    sleep 0.5
-    screen -S $SCREEN_NAME -p 0 -X stuff "tellraw @a [\"\",{\"text\":\"[$PREFIX] \",\"color\":\"gray\",\"italic\":true},{\"text\":\"$MESSAGE\",\"color\":\"$COLOR\",\"italic\":true,\"hoverEvent\":{\"action\":\"show_text\",\"value\":{\"text\":\"\",\"extra\":[{\"text\":\"$HOVER_MESSAGE\"}]}}}]$(printf \\r)"
+    execute-command "tellraw @a [\"\",{\"text\":\"[$PREFIX] \",\"color\":\"gray\",\"italic\":true},{\"text\":\"$MESSAGE\",\"color\":\"$COLOR\",\"italic\":true,\"hoverEvent\":{\"action\":\"show_text\",\"value\":{\"text\":\"\",\"extra\":[{\"text\":\"$HOVER_MESSAGE\"}]}}}]"
   fi
 }
 
