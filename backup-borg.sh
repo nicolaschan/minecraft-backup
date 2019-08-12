@@ -2,6 +2,7 @@
 
 # Minecraft server automatic backup management script
 # by Nicolas Chan
+# https://github.com/nicolaschan/minecraft-backup
 # MIT License
 #
 # For Minecraft servers running in a GNU screen.
@@ -133,9 +134,6 @@ message-players-color () {
   fi
 }
 
-# Notify players of start
-message-players "Starting backup..." "$ARCHIVE_FILE_NAME"
-
 # Parse file timestamp to one readable by "date" 
 parse-file-timestamp () {
   local DATE_STRING=$(echo $1 | awk -F_ '{gsub(/-/,":",$2); print $1" "$2}')
@@ -243,11 +241,17 @@ delete-old-backups () {
   esac
 }
 
+# Notify players of start
+message-players "Starting backup..." "$ARCHIVE_FILE_NAME"
+
 # Disable world autosaving
 execute-command "save-off"
 
-# Backup world
+# Record start time for performance reporting
 START_TIME=$(date +"%s")
+
+TMP_WORLD_SAVE_DIR=$(mktemp)
+cp -r "$SERVER_WORLD" "$TMP_WORLD_SAVE_DIR"
 
 if $USE_BORG_BACKUP; then
   borg create --compression "$COMPRESSION_ALGORITHM,$COMPRESSION_LEVEL" "$ARCHIVE_PATH" "$SERVER_WORLD"
