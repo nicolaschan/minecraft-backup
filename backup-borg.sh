@@ -250,9 +250,6 @@ execute-command "save-off"
 # Record start time for performance reporting
 START_TIME=$(date +"%s")
 
-TMP_WORLD_SAVE_DIR=$(mktemp)
-cp -r "$SERVER_WORLD" "$TMP_WORLD_SAVE_DIR"
-
 if $USE_BORG_BACKUP; then
   borg create --compression "$COMPRESSION_ALGORITHM,$COMPRESSION_LEVEL" "$ARCHIVE_PATH" "$SERVER_WORLD"
 else
