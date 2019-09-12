@@ -1,7 +1,8 @@
-#!/bin/bash
+#!/bin/env bash
 
 # Minecraft server automatic backup management script
 # by Nicolas Chan
+# https://github.com/nicolaschan/minecraft-backup
 # MIT License
 #
 # For Minecraft servers running in a GNU screen.
@@ -13,8 +14,10 @@ SERVER_WORLD="" # Server world directory
 BACKUP_DIRECTORY="" # Directory to save backups in
 MAX_BACKUPS=128 # -1 indicates unlimited
 DELETE_METHOD="thin" # Choices: thin, sequential, none; sequential: delete oldest; thin: keep last 24 hourly, last 30 daily, and monthly (use with 1 hr cron interval)
-COMPRESSION_ALGORITHM="gzip" # Leave empty for no compression
-COMPRESSION_FILE_EXTENSION=".gz" # Leave empty for no compression; Precede with a . (for example: ".gz")
+COMPRESSION_ALGORITHM="zstd" # Leave empty for no compression
+EXIT_IF_NO_SCREEN=false
+USE_BORG_BACKUP=false # Use borg backup
+COMPRESSION_FILE_EXTENSION=".zst" # Leave empty for no compression; Precede with a . (for example: ".gz")
 COMPRESSION_LEVEL=3 # Passed to the compression algorithm
 ENABLE_CHAT_MESSAGES=false # Tell players in Minecraft chat about backup status
 PREFIX="Backup" # Shows in the chat message
@@ -25,19 +28,23 @@ SUPPRESS_WARNINGS=false # Suppress warnings
 DATE_FORMAT="%F_%H-%M-%S"
 TIMESTAMP=$(date +$DATE_FORMAT)
 
-while getopts 'a:cd:e:f:hi:l:m:o:p:qs:v' FLAG; do
+while getopts 'a:bcd:e:f:ghi:l:m:o:p:qs:v' FLAG; do
   case $FLAG in
     a) COMPRESSION_ALGORITHM=$OPTARG ;;
+    b) USE_BORG_BACKUP=true ;;
     c) ENABLE_CHAT_MESSAGES=true ;;
     d) DELETE_METHOD=$OPTARG ;;
     e) COMPRESSION_FILE_EXTENSION=".$OPTARG" ;;
     f) TIMESTAMP=$OPTARG ;;
+    g) EXIT_IF_NO_SCREEN=true ;;
     h) echo "Minecraft Backup (by Nicolas Chan)"
        echo "-a    Compression algorithm (default: gzip)"
+       echo "-b    Use borg backup (default: false)"
        echo "-c    Enable chat messages"
        echo "-d    Delete method: thin (default), sequential, none"
        echo "-e    Compression file extension, exclude leading \".\" (default: gz)"
        echo "-f    Output file name (default is the timestamp)"
+       echo "-g    Do not backup (exit) if screen is not running (default: always backup)"
        echo "-h    Shows this help text"
        echo "-i    Input directory (path to world folder)"
        echo "-l    Compression level (default: 3)"
@@ -64,15 +71,16 @@ log-fatal () {
   echo -e "\033[0;31mFATAL:\033[0m $*"
 }
 log-warning () {
-  echo -e "\033[0;33mWARNING:\033[0m $*"
+  if ! $SUPPRESS_WARNINGS; then
+    echo -e "\033[0;33mWARNING:\033[0m $*"
+  fi
 }
 
 # Check for missing encouraged arguments
-if ! $SUPPRESS_WARNINGS; then
-  if [[ $SCREEN_NAME == "" ]]; then
-    log-warning "Minecraft screen name not specified (use -s)"
-  fi
+if [[ $SCREEN_NAME == "" ]]; then
+  log-warning "Minecraft screen name not specified (use -s)"
 fi
+
 # Check for required arguments
 MISSING_CONFIGURATION=false
 if [[ $SERVER_WORLD == "" ]]; then
@@ -88,8 +96,13 @@ if $MISSING_CONFIGURATION; then
   exit 0
 fi
 
-ARCHIVE_FILE_NAME=$TIMESTAMP.tar$COMPRESSION_FILE_EXTENSION
-ARCHIVE_PATH=$BACKUP_DIRECTORY/$ARCHIVE_FILE_NAME
+if $USE_BORG_BACKUP; then
+  ARCHIVE_FILE_NAME=$BACKUP_DIRECTORY
+  ARCHIVE_PATH="$BACKUP_DIRECTORY"::'{now}'
+else
+  ARCHIVE_FILE_NAME=$TIMESTAMP.tar$COMPRESSION_FILE_EXTENSION
+  ARCHIVE_PATH=$BACKUP_DIRECTORY/$ARCHIVE_FILE_NAME
+fi
 
 # Minecraft server screen interface functions
 message-players () {
@@ -99,8 +112,11 @@ message-players () {
 }
 execute-command () {
   local COMMAND=$1
-  if [[ $SCREEN_NAME != "" ]]; then
-    screen -S $SCREEN_NAME -p 0 -X stuff "$COMMAND$(printf \\r)"
+  if ! $(screen -S "$SCREEN_NAME" -Q "select" . &> /dev/null); then
+    return 1
+  fi
+  if [[ "$SCREEN_NAME" != "" ]]; then
+    screen -S "$SCREEN_NAME" -p 0 -X stuff "$COMMAND$(printf \\r)"
   fi
 }
 message-players-error () {
@@ -125,9 +141,6 @@ message-players-color () {
   fi
 }
 
-# Notify players of start
-message-players "Starting backup..." "$ARCHIVE_FILE_NAME"
-
 # Parse file timestamp to one readable by "date" 
 parse-file-timestamp () {
   local DATE_STRING=$(echo $1 | awk -F_ '{gsub(/-/,":",$2); print $1" "$2}')
@@ -137,7 +150,7 @@ parse-file-timestamp () {
 # Delete a backup
 delete-backup () {
   local BACKUP=$1
-  rm $BACKUP_DIRECTORY/$BACKUP
+  rm -f $BACKUP_DIRECTORY/$BACKUP
   message-players "Deleted old backup" "$BACKUP"
 }
 
@@ -187,9 +200,7 @@ delete-thinning () {
   # Warn if $MAX_BACKUPS does not have enough room for all the blocks
   TOTAL_BLOCK_SIZE=$(array-sum ${BLOCK_SIZES[@]})
   if [[ $TOTAL_BLOCK_SIZE -gt $MAX_BACKUPS ]]; then
-    if ! $SUPPRESS_WARNINGS; then
-      log-warning "MAX_BACKUPS ($MAX_BACKUPS) is smaller than TOTAL_BLOCK_SIZE ($TOTAL_BLOCK_SIZE)"
-    fi
+    log-warning "MAX_BACKUPS ($MAX_BACKUPS) is smaller than TOTAL_BLOCK_SIZE ($TOTAL_BLOCK_SIZE)"
   fi
 
   local CURRENT_INDEX=0
@@ -225,28 +236,6 @@ delete-thinning () {
   delete-sequentially
 }
 
-# Disable world autosaving
-execute-command "save-off"
-
-# Backup world
-START_TIME=$(date +"%s")
-case $COMPRESSION_ALGORITHM in
-  "") # No compression
-    tar -cf $ARCHIVE_PATH -C $SERVER_WORLD .
-    ;;
-  *) # With compression
-    tar -cf - -C $SERVER_WORLD . | $COMPRESSION_ALGORITHM -cv -$COMPRESSION_LEVEL - > $ARCHIVE_PATH 2>> /dev/null
-    ;;
-esac
-sync
-END_TIME=$(date +"%s")
-
-# Enable world autosaving
-execute-command "save-on"
-
-# Save the world
-execute-command "save-all"
-
 # Delete old backups
 delete-old-backups () {
   case $DELETE_METHOD in
@@ -257,18 +246,82 @@ delete-old-backups () {
   esac
 }
 
+clean-up () {
+  # Re-enable world autosaving
+  execute-command "save-on"
+
+  # Save the world
+  execute-command "save-all"
+}
+
+trap-ctrl-c () {
+  log-warning "Backup interrupted. Attempting to re-enable autosaving"
+  clean-up
+  exit 2
+}
+
+trap "trap-ctrl-c" 2
+
+# Check if screen is running
+if ! $(screen -S "$SCREEN_NAME" -Q "select" . &> /dev/null); then
+  if $EXIT_IF_NO_SCREEN; then
+    log-warning "Screen \"$SCREEN_NAME\" is not running. Exiting without backing up (because of -g option)."
+    exit 1
+  fi
+fi
+
+# Notify players of start
+message-players "Starting backup..." "$ARCHIVE_FILE_NAME"
+
+# Disable world autosaving
+execute-command "save-off"
+
+# Record start time for performance reporting
+START_TIME=$(date +"%s")
+
+if $USE_BORG_BACKUP; then
+  borg create --compression "$COMPRESSION_ALGORITHM,$COMPRESSION_LEVEL" "$ARCHIVE_PATH" "$SERVER_WORLD"
+else
+  case $COMPRESSION_ALGORITHM in
+    "") # No compression
+      tar -cf $ARCHIVE_PATH -C $SERVER_WORLD .
+      ;;
+    *) # With compression
+      tar -cf - -C $SERVER_WORLD . | $COMPRESSION_ALGORITHM -cv -$COMPRESSION_LEVEL - > $ARCHIVE_PATH 2>> /dev/null
+      ;;
+esac
+fi
+
+sync
+END_TIME=$(date +"%s")
+
+clean-up 
+
 # Notify players of completion
-WORLD_SIZE_BYTES=$(du -b --max-depth=0 $SERVER_WORLD | awk '{print $1}')
-ARCHIVE_SIZE_BYTES=$(du -b $ARCHIVE_PATH | awk '{print $1}')
+if $USE_BORG_BACKUP; then
+  BORG_LAST_ARCHIVE_INFO=$(borg info "$BACKUP_DIRECTORY" --last 1 --json)
+  BORG_REPO_INFO=$(borg info "$BACKUP_DIRECTORY" --json)
+
+  WORLD_SIZE_BYTES=$(echo "$BORG_LAST_ARCHIVE_INFO" | jq '.["archives"][0]["stats"]["original_size"]')
+  ARCHIVE_SIZE_BYTES=$(echo "$BORG_LAST_ARCHIVE_INFO" | jq '.["archives"][0]["stats"]["deduplicated_size"]')
+  BACKUP_DIRECTORY_SIZE=$(echo "$BORG_REPO_INFO" | jq '.["cache"]["stats"]["unique_csize"]' | numfmt --to=iec)
+else
+  WORLD_SIZE_BYTES=$(du -b --max-depth=0 $SERVER_WORLD | awk '{print $1}')
+  ARCHIVE_SIZE_BYTES=$(du -b $ARCHIVE_PATH | awk '{print $1}')
+  BACKUP_DIRECTORY_SIZE=$(du -h --max-depth=0 $BACKUP_DIRECTORY | awk '{print $1}')
+fi
+
+ARCHIVE_SIZE=$(numfmt --to=iec "$ARCHIVE_SIZE_BYTES")
 COMPRESSION_PERCENT=$(($ARCHIVE_SIZE_BYTES * 100 / $WORLD_SIZE_BYTES))
-ARCHIVE_SIZE=$(du -h $ARCHIVE_PATH | awk '{print $1}')
-BACKUP_DIRECTORY_SIZE=$(du -h --max-depth=0 $BACKUP_DIRECTORY | awk '{print $1}')
 TIME_DELTA=$((END_TIME - START_TIME))
 
 # Check that archive size is not null and at least 1024 KB
 if [[ "$ARCHIVE_SIZE" != "" && "$ARCHIVE_SIZE_BYTES" -gt 8 ]]; then
   message-players-success "Backup complete!" "$TIME_DELTA s, $ARCHIVE_SIZE/$BACKUP_DIRECTORY_SIZE, $COMPRESSION_PERCENT%"
-  delete-old-backups
+  if ! $USE_BORG_BACKUP; then
+    delete-old-backups
+  fi
 else
   message-players-error "Backup was not saved!" "Please notify an administrator"
 fi
+
