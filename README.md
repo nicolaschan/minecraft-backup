@@ -16,7 +16,7 @@ tar: /some/path/here/world/region/r.1.11.mca: file changed as we read it
 ```
 This script will take care of disabling and then re-enabling autosaving for you, and also alert players in the chat of successful backups or errors.
 This way, you don't have to shut down the server to take backups.
-You'll also probably need some way to delete old backups, and this script can handle keeping either a number of most recent backups, or thinning them out based on hour/day/week.
+You'll also probably need some way to delete old backups, and this script can handle keeping either a number of most recent backups, or thinning them out based on hour/day/week. It can also use another backend such as [restic](https://github.com/restic/restic).
 
 ### Alternatives
 This script is developed with vanilla servers in mind. If you are running a server with plugins or mods, then you can probably find a backup plugin/mod to do a similar job.
