@@ -1,5 +1,5 @@
 # Minecraft Backup
-Backup script for Linux servers running a Minecraft server in a GNU Screen.
+Backup script for Linux servers running a Minecraft server in a GNU Screen, supporting saving in compressed tar format or to [restic](https://github.com/restic/restic).
 
 ## Quick Start
 ```bash
