@@ -140,7 +140,8 @@ trap-ctrl-c () {
 trap "trap-ctrl-c" 2
 
 # Notify players of start
-message-players "Starting backup..." "$TIMESTAMP"
+SHORT_BACKUP_METHOD=$(basename "$BACKUP_METHOD")
+message-players "Starting backup..." "$SHORT_BACKUP_METHOD ${BACKUP_METHOD_OPTIONS[*]}"
 
 # Disable world autosaving
 execute-command "save-off"
