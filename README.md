@@ -1,10 +1,18 @@
 # Minecraft Backup
-Backup script for Linux servers running a Minecraft server in a GNU Screen
+Backup script for Linux servers running a Minecraft server in a GNU Screen.
 
-### Disclaimer
-Backups are essential to the integrity of your Minecraft world. You should automate regular backups and **check that your backups work**. While this script has been used in production for several years, it is up to you to make sure that your backups work and that you have a reliable backup policy. 
+## Why?
+### Why not just put `tar` in crontab?
+If the Minecraft server is currently running, you need to disable world autosaving, or you will likely get an error like this:
+```
+tar: /some/path/here/world/region/r.1.11.mca: file changed as we read it
+```
+This script will take care of disabling and then re-enabling autosaving for you, and also alert players in the chat of successful backups or errors.
+This way, you don't have to shut down the server to take backups.
+You'll also probably need some way to delete old backups, and this script can handle keeping either a number of most recent backups, or thinning them out based on hour/day/week.
 
-Please refer to the LICENSE (MIT License) for the full legal disclaimer.
+### Alternatives
+This script is developed with vanilla servers in mind. If you are running a server with plugins or mods, then you can probably find a backup plugin/mod to do a similar job.
 
 ## Features
 - Create backups of your world folder
@@ -12,18 +20,22 @@ Please refer to the LICENSE (MIT License) for the full legal disclaimer.
   - "thin" - keep last 24 hourly, last 30 daily, and use remaining space for monthly backups
   - "sequential" - delete oldest backup
 - Choose your own compression algorithm (tested with: `gzip`, `xz`, `zstd`)
-- Able to print backup status and info to the Minecraft chat
+- Print backup status and info to the Minecraft chat
+- Customizable backup backends and Minecraft server interface (currently supports restic)
 
 ## Requirements
-- Linux computer (tested on Ubuntu)
+- Linux computer (tested on Arch Linux)
 - GNU Screen (running your Minecraft server)
-- Minecraft server (tested with Vanilla 1.10.2 only)
+- Minecraft server
 
 ## Installation
-1. Download the script: `$ wget https://raw.githubusercontent.com/nicolaschan/minecraft-backup/master/backup.sh`
-2. Mark as executable: `$ chmod +x backup.sh`
-3. Use the command line options or configure default values at the top of `backup.sh`:
+```bash
+# Download the scripts
+git clone https://github.com/nicolaschan/minecraft-backup.git
+```
+*NOTE*: You will need to keep `backup.sh` in the same directory as the `src/` directory, since it looks for dependencies in `src/`.
 
+## Usage Options
 Command line options:
 ```text
 -a    Compression algorithm (default: gzip)
@@ -31,6 +43,7 @@ Command line options:
 -d    Delete method: thin (default), sequential, none
 -e    Compression file extension, exclude leading "." (default: gz)
 -f    Output file name (default is the timestamp)
+-g    Do not backup (exit) if screen is not running (default: always backup)
 -h    Shows this help text
 -i    Input directory (path to world folder)
 -l    Compression level (default: 3)
@@ -42,33 +55,71 @@ Command line options:
 -v    Verbose mode
 ```
 
-Example usage of command line options:
+## Example Usage
+### One-off Example
 ```bash
-./backup.sh -c -i /home/server/minecraft-server/world -o /mnt/external-storage/minecraft-backups -s minecraft
+./backup.sh -c -s minecraft -i minecraft-server/world -o backups/
 ```
-This will use show chat messages (`-c`) in the screen called "minecraft" and save a backup of `/home/server/minecraft-server/world` into `/mnt/external-storage/minecraft-backups` using the default thinning delete policy for old backups.
+In this example, we print the status to the Minecraft chat (`-c`) and save a backup of `minecraft-server/world` into `backups/` using the default thinning delete policy for old backups. While this works for performing a single backup, it is _highly_ recommended that you automate your backups.
 
-4. Create a cron job to automatically backup:
-    - Edit the crontab: `$ crontab -e`
-    - Example for hourly backups: `00 * * * * /path/to/backup.sh`
-  
+### Automated using systemd timers
+
+### Automated with cron
+- Edit the crontab:
+```bash
+crontab -e
+```
+- Example for hourly backups:
+```
+00 * * * * /path/to/minecraft-backup/backup.sh -c -s minecraft -i /path/to/minecraft-server/world -o /path/to/backups
+```
+
 ## Retrieving Backups
-Always test your backups! Backups are in the `tar` format and compressed depending on the option you choose. To restore, first decompress if necessary and then extract using tar. You may be able to do this in one command if `tar` supports your compression option, as is the case with `gzip`:
+Always test your backups! Backups are in the `tar` format and compressed depending on the option you choose. To restore, first decompress if necessary and then extract using `tar`. You may be able to do this in one command if `tar` supports your compression option, as is the case with `gzip`:
 
 Example:
 ```bash
 mkdir restored-world
-cd restored-world
-tar -xzvf /path/to/backups/2019-04-09_02-15-01.tar.gz
+# if using gzip:
+gzip -cd 2017-07-31_00-00-00.tar.gz | tar xf - -C restored-world
+# if using zstd:
+zstd -cd 2017-07-31_00-00-00.tar.zst | tar xf - -C restored-world
 ```
 
 Then you can move your restored world (`restored-world` in this case) to your Minecraft server folder and rename it (usually called `world`) so the Minecraft server uses it.
 
+## Using [restic](https://github.com/restic/restic)
+The `backup-restic.sh` script provides a similar interface for restic.
+To specify your repository's password, you'll need to export the `$RESTIC_PASSWORD_FILE` or `$RESTIC_PASSWORD_COMMAND` environment variable.
+
+```bash
+restic init -r /path/to/restic-backups
+touch restic-password.txt # make a new file for your restic password
+chmod 600 restic-password.txt # make sure only you can read your password
+echo "my_restic-password" > restic_password.txt
+export RESTIC_PASSWORD_FILE=$(pwd)/restic_password.txt
+
+/path/to/minecraft-backup/backup-restic.sh -c -s minecraft -i /path/to/minecraft-server/world -o /path/to/restic-backups
+```
+
+When you automate this, you can set the environment variable in the command like so:
+```bash
+RESTIC_PASSWORD_FILE=/path/to/restic-password.txt /path/to/minecraft-backup/backup-restic.sh -c -s minecraft -i /path/to/minecraft-server/world -o /path/to/restic-backups
+```
+
 ## Help
-- Make sure the compression algorithm you specify is installed on your system. (zstd is not installed by default)
+- Make sure the compression algorithm you specify is installed on your system. (zstd is not always installed by default)
 - Make sure your compression algorithm is in the crontab's PATH
 - Make sure cron has permissions for all the files involved and access to the Minecraft server's GNU Screen
 - It's surprising how much space backups can take--make sure you have enough empty space
-- `SERVER_DIRECTORY` should be the server directory, not the `world` directory
-- Do not put trailing `/` in the `SERVER_DIRECTORY` or `BACKUP_DIRECTORY`
 - If "thin" delete method is behaving weirdly, try emptying your backup directory or switch to "sequential"
+
+## Disclaimer
+Backups are essential to the integrity of your Minecraft world. You should automate regular backups and **check that your backups work**. It is up to you to make sure that your backups work and that you have a reliable backup policy. 
+
+Some backup tips:
+- Drives get corrupted or fail! Backup to a _different_ drive than the one your server is running on, so if that drive fails then you have backups.
+- _Automate_ backups so you never lose too much progress.
+- Check that your backups work from time to time.
+
+Please refer to the LICENSE (MIT License) for the full legal disclaimer.

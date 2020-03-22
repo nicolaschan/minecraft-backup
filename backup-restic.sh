@@ -12,23 +12,14 @@
 SCREEN_NAME="" # Name of the GNU Screen your Minecraft server is running in
 SERVER_WORLD="" # Server world directory
 BACKUP_DIRECTORY="" # Directory to save backups in
-MAX_BACKUPS=128 # -1 indicates unlimited
-DELETE_METHOD="thin" # Choices: thin, sequential, none; sequential: delete oldest; thin: keep last 24 hourly, last 30 daily, and monthly (use with 1 hr cron interval)
-COMPRESSION_ALGORITHM="gzip" # Leave empty for no compression
 EXIT_IF_NO_SCREEN=false # Skip backup if there is no minecraft screen running
-COMPRESSION_FILE_EXTENSION=".gz" # Leave empty for no compression; Precede with a . (for example: ".gz")
-COMPRESSION_LEVEL=3 # Passed to the compression algorithm
 ENABLE_CHAT_MESSAGES=false # Tell players in Minecraft chat about backup status
 PREFIX="Backup" # Shows in the chat message
 DEBUG=false # Enable debug messages
 SUPPRESS_WARNINGS=false # Suppress warnings
 
-# Other Variables (do not modify)
-DATE_FORMAT="%F_%H-%M-%S"
-TIMESTAMP=$(date +$DATE_FORMAT)
-
 OPTIND=1
-while getopts 'a:bcd:e:f:ghi:l:m:o:p:qs:v' FLAG; do
+while getopts 'cghi:o:p:qs:v' FLAG; do
   case $FLAG in
     a) COMPRESSION_ALGORITHM=$OPTARG ;;
     c) ENABLE_CHAT_MESSAGES=true ;;
@@ -37,16 +28,10 @@ while getopts 'a:bcd:e:f:ghi:l:m:o:p:qs:v' FLAG; do
     f) TIMESTAMP=$OPTARG ;;
     g) EXIT_IF_NO_SCREEN=true ;;
     h) echo "Minecraft Backup Script: https://github.com/nicolaschan/minecraft-backup.git"
-       echo "-a    Compression algorithm (default: gzip)"
        echo "-c    Enable chat messages"
-       echo "-d    Delete method: thin (default), sequential, none"
-       echo "-e    Compression file extension, exclude leading \".\" (default: gz)"
-       echo "-f    Output file name (default is the timestamp)"
        echo "-g    Do not backup (exit) if screen is not running (default: always backup)"
        echo "-h    Shows this help text"
        echo "-i    Input directory (path to world folder)"
-       echo "-l    Compression level (default: 3)"
-       echo "-m    Maximum backups to keep, use -1 for unlimited (default: 128)"
        echo "-o    Output directory"
        echo "-p    Prefix that shows in Minecraft chat (default: Backup)"
        echo "-q    Suppress warnings"
@@ -104,14 +89,8 @@ fi
   "$BASE_DIR/src/exec-methods/screen.sh" \
     -s "$SCREEN_NAME" \
   -- \
-  "$BASE_DIR/src/backup-methods/tar.sh" \
-    -a "$COMPRESSION_ALGORITHM" \
-    -d "$DELETE_METHOD" \
-    -e "$COMPRESSION_FILE_EXTENSION" \
-    -f "$TIMESTAMP" \
+  "$BASE_DIR/src/backup-methods/restic.sh" \
     -i "$SERVER_WORLD" \
-    -l "$COMPRESSION_LEVEL" \
-    -m "$MAX_BACKUPS" \
     -o "$BACKUP_DIRECTORY" \
   -- \
     -c "$ENABLE_CHAT_MESSAGES" \

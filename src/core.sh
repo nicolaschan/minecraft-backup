@@ -152,6 +152,7 @@ fi
 # Record start time for performance reporting
 START_TIME=$(date +"%s")
 minecraft-backup-backup
+BACKUP_RESULT=$?
 END_TIME=$(date +"%s")
 
 clean-up 
@@ -160,7 +161,7 @@ TIME_DELTA=$((END_TIME - START_TIME))
 CHECK_MESSAGE=$(minecraft-backup-check)
 CHECK_RESULT=$?
 
-if [[ $CHECK_RESULT != "0" ]]; then
+if [[ $BACKUP_RESULT != "0" ]] || [[ $CHECK_RESULT != "0" ]]; then
   message-players-error "Backup failed!" "Please notify an admin."
   exit $CHECK_RESULT
 fi
