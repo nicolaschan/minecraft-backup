@@ -110,13 +110,13 @@ WantedBy=multi-user.target
 Then you can run the following to enable the timer:
 ```bash
 # enable the timer right now only
-systemd --user start minecraft-backup.timer
+systemctl --user start minecraft-backup.timer
 
 # start the timer on reboot
-systemd --user enable minecraft-backup.timer
+systemctl --user enable minecraft-backup.timer
 
 # see status of timers
-systemd --user list-timers
+systemctl --user list-timers
 ```
 
 #### Advanced example (with restic and multiple servers)
@@ -151,7 +151,7 @@ WantedBy=multi-user.target
 
 To enable:
 ```bash
-systemd --user enable minecraft-backup@your_server_name_here
+systemctl --user enable minecraft-backup@your_server_name_here
 ```
 
 
