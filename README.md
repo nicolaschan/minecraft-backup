@@ -174,13 +174,13 @@ The `backup-restic.sh` script provides a similar interface for restic.
 To specify your repository's password, you'll need to export the `$RESTIC_PASSWORD_FILE` or `$RESTIC_PASSWORD_COMMAND` environment variable.
 
 ```bash
-restic init -r /path/to/restic-backups
+restic init -r /path/to/restic-repo
 touch restic-password.txt # make a new file for your restic password
 chmod 600 restic-password.txt # make sure only you can read your password
-echo "my_restic-password" > restic_password.txt
+echo "my_restic-password" > restic-password.txt
 export RESTIC_PASSWORD_FILE=$(pwd)/restic_password.txt
 
-/path/to/minecraft-backup/backup-restic.sh -c -s minecraft -i /path/to/minecraft-server/world -o /path/to/restic-backups
+/path/to/minecraft-backup/backup-restic.sh -c -s minecraft -i /path/to/minecraft-server/world -o /path/to/restic-repo
 ```
 
 See above for an example automating this using systemd timers.
