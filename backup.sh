@@ -1,4 +1,4 @@
-#!/bin/env bash
+#!/usr/bin/env bash
 
 # Minecraft server automatic backup management script
 # by Nicolas Chan
@@ -27,6 +27,7 @@ SUPPRESS_WARNINGS=false # Suppress warnings
 DATE_FORMAT="%F_%H-%M-%S"
 TIMESTAMP=$(date +$DATE_FORMAT)
 
+OPTIND=1
 while getopts 'a:bcd:e:f:ghi:l:m:o:p:qs:v' FLAG; do
   case $FLAG in
     a) COMPRESSION_ALGORITHM=$OPTARG ;;
@@ -68,7 +69,9 @@ done
 BASE_DIR=$(dirname "$(realpath "$0")")
 
 # shellcheck source=src/logging.sh
-source "$BASE_DIR/src/logging.sh"
+source "$BASE_DIR/src/logging.sh" \
+  -q "$SUPPRESS_WARNINGS" \
+  -v "$DEBUG"
 
 # Check for missing encouraged arguments
 if [[ $SCREEN_NAME == "" ]]; then

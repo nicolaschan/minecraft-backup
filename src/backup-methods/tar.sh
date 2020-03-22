@@ -23,16 +23,14 @@ mkdir -p "$BACKUP_DIRECTORY"
 
 # Parse file timestamp to one readable by "date"
 parse-file-timestamp () {
-  local DATE_STRING
-  DATE_STRING=$(echo "$1" | awk -F_ '{gsub(/-/,":",$2); print $1" "$2}')
-  echo "$DATE_STRING"
+  echo "$1" | awk -F_ '{gsub(/-/,":",$2); print $1" "$2}'
 }
 
 # Delete a backup
 delete-backup () {
   local BACKUP=$1
   rm -f "$BACKUP_DIRECTORY/$BACKUP"
-  message-players "Deleted old backup" "$BACKUP"
+  echo "Deleted old backup" "$BACKUP"
 }
 
 # Sequential delete method
@@ -44,9 +42,9 @@ delete-sequentially () {
     BASENAME=$(basename "$BACKUP_NAME")
     BACKUPS_UNSORTED+=("$BASENAME")
   done
-  local BACKUPS=()
   # List oldest first
-  while IFS='' read -r line; do BACKUPS+=("$line"); done < <(IFS=$'\n' sort <<<"${BACKUPS_UNSORTED[*]}")
+  # shellcheck disable=SC2207
+  IFS=$'\n' BACKUPS=($(sort <<<"${BACKUPS_UNSORTED[*]}"))
 
   while [[ $MAX_BACKUPS -ge 0 && ${#BACKUPS[@]} -gt $MAX_BACKUPS ]]; do
     delete-backup "${BACKUPS[0]}"
@@ -57,9 +55,9 @@ delete-sequentially () {
       BASENAME=$(basename "$BACKUP_NAME")
       BACKUPS_UNSORTED+=("$BASENAME")
     done
-    local BACKUPS=()
     # List oldest first
-    while IFS='' read -r line; do BACKUPS+=("$line"); done < <(IFS=$'\n' sort <<<"${BACKUPS_UNSORTED[*]}")
+    # shellcheck disable=SC2207
+    IFS=$'\n' BACKUPS=($(sort <<<"${BACKUPS_UNSORTED[*]}"))
   done
 }
 
@@ -107,6 +105,7 @@ delete-thinning () {
   fi
 
   local CURRENT_INDEX=0
+
   local BACKUPS_UNSORTED_RAW=("$BACKUP_DIRECTORY"/*)
   local BACKUPS_UNSORTED=()
   for BACKUP_NAME in "${BACKUPS_UNSORTED_RAW[@]}"; do
@@ -114,9 +113,9 @@ delete-thinning () {
     BASENAME=$(basename "$BACKUP_NAME")
     BACKUPS_UNSORTED+=("$BASENAME")
   done
-  local BACKUPS=()
   # List newest first
-  while IFS='' read -r line; do BACKUPS+=("$line"); done < <(IFS=$'\n' sort -r <<<"${BACKUPS_UNSORTED[*]}")
+  # shellcheck disable=SC2207
+  IFS=$'\n' BACKUPS=($(sort -r <<<"${BACKUPS_UNSORTED[*]}"))
 
   for BLOCK_INDEX in "${!BLOCK_SIZES[@]}"; do
     local BLOCK_SIZE=${BLOCK_SIZES[BLOCK_INDEX]}
@@ -130,14 +129,8 @@ delete-thinning () {
 
     local OLDEST_BACKUP_TIMESTAMP
     OLDEST_BACKUP_TIMESTAMP=$(parse-file-timestamp "${OLDEST_BACKUP_IN_BLOCK:0:19}")
-    local BLOCK_COMMAND="$BLOCK_FUNCTION $OLDEST_BACKUP_TIMESTAMP"
 
-    if $BLOCK_COMMAND; then
-      # Oldest backup in this block satisfies the condition for placement in the next block
-      if $DEBUG; then
-        echo "$OLDEST_BACKUP_IN_BLOCK promoted to next block" 
-      fi
-    else
+   if ! $BLOCK_FUNCTION "$OLDEST_BACKUP_TIMESTAMP"; then
       # Oldest backup in this block does not satisfy the condition for placement in next block
       delete-backup "$OLDEST_BACKUP_IN_BLOCK"
       break

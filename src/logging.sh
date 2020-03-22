@@ -3,6 +3,7 @@
 SUPPRESS_WARNINGS=false
 DEBUG=true
 
+OPTIND=1
 while getopts 'q:v:' FLAG; do
   case $FLAG in
     q) SUPPRESS_WARNINGS=$OPTARG ;;

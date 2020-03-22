@@ -1,12 +1,5 @@
 #!/usr/bin/env bash
 
-# Minecraft server automatic backup management script
-# by Nicolas Chan
-# https://github.com/nicolaschan/minecraft-backup
-# MIT License
-#
-# For most convenience, run automatically with cron.
-
 # This script implements the core functionality, and expects the following
 # functions to be defined by the method scripts:
 #
@@ -35,6 +28,7 @@ while [[ $1 != "--" ]]; do
 done
 shift
 
+OPTIND=1
 while getopts 'c:g:p:q:v:' FLAG; do
   case $FLAG in
     c) ENABLE_CHAT_MESSAGES=$OPTARG ;;
@@ -124,7 +118,7 @@ message-players-color () {
   local HOVER_MESSAGE=$3
   log-info "$MESSAGE ($HOVER_MESSAGE)"
   if $ENABLE_CHAT_MESSAGES; then
-  execute_command \
+  execute-command \
     "tellraw @a [\"\",{\"text\":\"[$PREFIX] \",\"color\":\"gray\",\"italic\":true},{\"text\":\"$MESSAGE\",\"color\":\"$COLOR\",\"italic\":true,\"hoverEvent\":{\"action\":\"show_text\",\"value\":{\"text\":\"\",\"extra\":[{\"text\":\"$HOVER_MESSAGE\"}]}}}]"
   fi
 }
