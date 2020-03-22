@@ -1,6 +1,13 @@
 # Minecraft Backup
 Backup script for Linux servers running a Minecraft server in a GNU Screen.
 
+## Quick Start
+```bash
+# Download the scripts
+git clone https://github.com/nicolaschan/minecraft-backup.git
+./minecraft-backup/backup.sh -c -s $SCREEN_NAME -i $WORLD_DIR -o $BACKUP_DIR
+```
+
 ## Why?
 ### Why not just put `tar` in crontab?
 If the Minecraft server is currently running, you need to disable world autosaving, or you will likely get an error like this:
@@ -21,7 +28,7 @@ This script is developed with vanilla servers in mind. If you are running a serv
   - "sequential" - delete oldest backup
 - Choose your own compression algorithm (tested with: `gzip`, `xz`, `zstd`)
 - Print backup status and info to the Minecraft chat
-- Customizable backup backends and Minecraft server interface (currently supports restic)
+- Customizable backup backends and Minecraft server interface (currently supports locally managed tar archives or [restic](https://github.com/restic/restic))
 
 ## Requirements
 - Linux computer (tested on Arch Linux)
@@ -62,8 +69,6 @@ Command line options:
 ```
 In this example, we print the status to the Minecraft chat (`-c`) and save a backup of `minecraft-server/world` into `backups/` using the default thinning delete policy for old backups. While this works for performing a single backup, it is _highly_ recommended that you automate your backups.
 
-### Automated using systemd timers
-
 ### Automated with cron
 - Edit the crontab:
 ```bash
@@ -72,6 +77,84 @@ crontab -e
 - Example for hourly backups:
 ```
 00 * * * * /path/to/minecraft-backup/backup.sh -c -s minecraft -i /path/to/minecraft-server/world -o /path/to/backups
+```
+
+### Automated using systemd timers
+#### Simple example (single server)
+`~/.config/systemd/user/minecraft-backup.timer`
+```systemd
+[Unit]
+Description=Run Minecraft backup hourly
+
+[Timer]
+OnCalendar=hourly
+Persistent=false
+Unit=minecraft-backup.service
+
+[Install]
+WantedBy=timers.target
+```
+`~/.config/systemd/user/minecraft-backup.service`
+```systemd
+[Unit]
+Description=Run Minecraft backup hourly
+
+[Timer]
+OnCalendar=hourly
+Persistent=false
+Unit=minecraft-backup@.service
+
+[Install]
+WantedBy=timers.target
+[nicolas@monad user]$ cat minecraft-backup\@.service 
+[Unit]
+Description=Perfrom Minecraft Backup
+
+[Service]
+Type=oneshot
+ExecStart=/path/to/minecraft-backup/backup.sh -c -s minecraft -i /path/to/world -o /path/to/backups
+
+[Install]
+WantedBy=multi-user.target
+```
+
+#### Advanced example (with restic and multiple servers)
+`~/.config/systemd/user/minecraft-backup.timer`
+```systemd
+[Unit]
+Description=Run Minecraft backup hourly
+
+[Timer]
+OnCalendar=hourly
+Persistent=false
+Unit=minecraft-backup@.service
+
+[Install]
+WantedBy=timers.target
+```
+`~/.config/systemd/user/minecraft-backup@.service`
+```systemd
+[Unit]
+Description=Run Minecraft backup hourly
+
+[Timer]
+OnCalendar=hourly
+Persistent=false
+Unit=minecraft-backup@.service
+
+[Install]
+WantedBy=timers.target
+[nicolas@monad user]$ cat minecraft-backup\@.service 
+[Unit]
+Description=Perfrom Minecraft Backup
+
+[Service]
+Type=oneshot
+Environment="RESTIC_PASSWORD_FILE=/path/to/restic-password.txt"
+ExecStart=/path/to/minecraft-backup/backup-restic.sh -c -s %i -i /path/to/server/%i/world -o /path/to/restic-repo
+
+[Install]
+WantedBy=multi-user.target
 ```
 
 ## Retrieving Backups
