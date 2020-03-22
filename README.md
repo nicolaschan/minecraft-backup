@@ -40,7 +40,7 @@ This script is developed with vanilla servers in mind. If you are running a serv
 # Download the scripts
 git clone https://github.com/nicolaschan/minecraft-backup.git
 ```
-*NOTE*: You will need to keep `backup.sh` in the same directory as the `src/` directory, since it looks for dependencies in `src/`.
+**NOTE**: You will need to keep `backup.sh` in the same directory as the `src/` directory, since it looks for dependencies in `src/`.
 
 ## Usage Options
 Command line options:
@@ -67,7 +67,7 @@ Command line options:
 ```bash
 ./backup.sh -c -s minecraft -i minecraft-server/world -o backups/
 ```
-In this example, we print the status to the Minecraft chat (`-c`) and save a backup of `minecraft-server/world` into `backups/` using the default thinning delete policy for old backups. While this works for performing a single backup, it is _highly_ recommended that you automate your backups.
+In this example, we print the status to the Minecraft chat (`-c`), use `minecraft` as the name of the screen, and save a backup of `minecraft-server/world` into `backups/` using the default thinning delete policy for old backups. While this works for performing a single backup, it is _highly_ recommended that you automate your backups.
 
 ### Automated with cron
 - Edit the crontab:
