@@ -183,10 +183,7 @@ export RESTIC_PASSWORD_FILE=$(pwd)/restic_password.txt
 /path/to/minecraft-backup/backup-restic.sh -c -s minecraft -i /path/to/minecraft-server/world -o /path/to/restic-backups
 ```
 
-When you automate this, you can set the environment variable in the command like so:
-```bash
-RESTIC_PASSWORD_FILE=/path/to/restic-password.txt /path/to/minecraft-backup/backup-restic.sh -c -s minecraft -i /path/to/minecraft-server/world -o /path/to/restic-backups
-```
+See above for an example automating this using systemd timers.
 
 ## Help
 - Make sure the compression algorithm you specify is installed on your system. (zstd is not always installed by default)
