@@ -32,7 +32,7 @@ OPTIND=1
 while getopts 'c:g:p:q:v:' FLAG; do
   case $FLAG in
     c) ENABLE_CHAT_MESSAGES=$OPTARG ;;
-    g) EXIT_IF_NO_SCREEN=true ;;
+    g) EXIT_IF_NO_SCREEN=$OPTARG ;;
     p) PREFIX=$OPTARG ;;
     q) SUPPRESS_WARNINGS=$OPTARG ;;
     v) DEBUG=$OPTARG ;;
