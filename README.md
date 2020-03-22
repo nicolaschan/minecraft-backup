@@ -97,18 +97,7 @@ WantedBy=timers.target
 `~/.config/systemd/user/minecraft-backup.service`
 ```systemd
 [Unit]
-Description=Run Minecraft backup hourly
-
-[Timer]
-OnCalendar=hourly
-Persistent=false
-Unit=minecraft-backup@.service
-
-[Install]
-WantedBy=timers.target
-[nicolas@monad user]$ cat minecraft-backup\@.service 
-[Unit]
-Description=Perfrom Minecraft Backup
+Description=Perform Minecraft backup
 
 [Service]
 Type=oneshot
@@ -118,7 +107,21 @@ ExecStart=/path/to/minecraft-backup/backup.sh -c -s minecraft -i /path/to/world 
 WantedBy=multi-user.target
 ```
 
+Then you can run the following to enable the timer:
+```bash
+# enable the timer right now only
+systemd --user start minecraft-backup.timer
+
+# start the timer on reboot
+systemd --user enable minecraft-backup.timer
+
+# see status of timers
+systemd --user list-timers
+```
+
 #### Advanced example (with restic and multiple servers)
+If you have multiple servers, you can use `@` to create timers on-demand for each server. This assumes the server directories are named the same as the screen name.
+
 `~/.config/systemd/user/minecraft-backup.timer`
 ```systemd
 [Unit]
@@ -135,18 +138,7 @@ WantedBy=timers.target
 `~/.config/systemd/user/minecraft-backup@.service`
 ```systemd
 [Unit]
-Description=Run Minecraft backup hourly
-
-[Timer]
-OnCalendar=hourly
-Persistent=false
-Unit=minecraft-backup@.service
-
-[Install]
-WantedBy=timers.target
-[nicolas@monad user]$ cat minecraft-backup\@.service 
-[Unit]
-Description=Perfrom Minecraft Backup
+Description=Perform Minecraft backup
 
 [Service]
 Type=oneshot
@@ -156,6 +148,12 @@ ExecStart=/path/to/minecraft-backup/backup-restic.sh -c -s %i -i /path/to/server
 [Install]
 WantedBy=multi-user.target
 ```
+
+To enable:
+```bash
+systemd --user enable minecraft-backup@your_server_name_here
+```
+
 
 ## Retrieving Backups
 Always test your backups! Backups are in the `tar` format and compressed depending on the option you choose. To restore, first decompress if necessary and then extract using `tar`. You may be able to do this in one command if `tar` supports your compression option, as is the case with `gzip`:
