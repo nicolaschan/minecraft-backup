@@ -122,6 +122,11 @@ systemctl --user list-timers
 #### Advanced example (with restic and multiple servers)
 If you have multiple servers, you can use `@` to create timers on-demand for each server. This assumes the server directories are named the same as the screen name.
 
+To start at boot, you may also need to enable linger:
+```bash
+loginctl enable-linger "$USER"
+```
+
 `~/.config/systemd/user/minecraft-backup.timer`
 ```systemd
 [Unit]
