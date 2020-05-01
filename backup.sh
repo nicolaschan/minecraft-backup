@@ -138,7 +138,7 @@ parse-file-timestamp () {
 delete-backup () {
   local BACKUP=$2
   local BACKUP_DIRECTORY=$1
-  rm $BACKUP_DIRECTORY/$BACKUP
+  rm "$BACKUP_DIRECTORY/$BACKUP"
   message-players "Deleted old backup" "$BACKUP"
 }
 
@@ -146,10 +146,11 @@ delete-backup () {
 delete-sequentially () {
   local BACKUP_DIRECTORY=$1
   local WORLD_NAME=$2
-  local BACKUPS=($(ls $BACKUP_DIRECTORY | grep $WORLD_NAME))
+  local BACKUPS=($(ls $BACKUP_DIRECTORY | grep "$WORLD_NAME\.tar$COMPRESSION_FILE_EXTENSION\$"))
+  echo "$BACKUPS"
   while [[ $MAX_BACKUPS -ge 0 && ${#BACKUPS[@]} -gt $MAX_BACKUPS ]]; do
-    delete-backup BACKUP_DIRECTORY ${BACKUPS[0]}
-    BACKUPS=($(ls $BACKUP_DIRECTORY | grep $WORLD_NAME))
+    delete-backup $BACKUP_DIRECTORY ${BACKUPS[0]}
+    BACKUPS=($(ls $BACKUP_DIRECTORY | grep "$WORLD_NAME\.tar$COMPRESSION_FILE_EXTENSION\$"))
   done
 }
 
@@ -198,7 +199,7 @@ delete-thinning () {
   fi
 
   local CURRENT_INDEX=0
-  local BACKUPS=($(ls -r $BACKUP_DIRECTORY | grep $WORLD_NAME)) # List newest first
+  local BACKUPS=($(ls -r $BACKUP_DIRECTORY | grep "$WORLD_NAME\.tar$COMPRESSION_FILE_EXTENSION\$")) # List newest first
 
   for BLOCK_INDEX in ${!BLOCK_SIZES[@]}; do
     local BLOCK_SIZE=${BLOCK_SIZES[BLOCK_INDEX]}
