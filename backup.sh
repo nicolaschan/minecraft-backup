@@ -8,7 +8,7 @@
 # For most convenience, run automatically with cron.
 
 # Default Configuration 
-SCREEN_NAME="" # Name of the GNU Screen your Minecraft server is running in
+SCREEN_NAME="" # Name of the GNU Screen or tmux pane your Minecraft server is running in
 SERVER_WORLD="" # Server world directory
 BACKUP_DIRECTORY="" # Directory to save backups in
 MAX_BACKUPS=128 # -1 indicates unlimited
@@ -20,12 +20,13 @@ ENABLE_CHAT_MESSAGES=false # Tell players in Minecraft chat about backup status
 PREFIX="Backup" # Shows in the chat message
 DEBUG=false # Enable debug messages
 SUPPRESS_WARNINGS=false # Suppress warnings
+WINDOW_MANAGER="screen" # Choices: screen, tmux
 
 # Other Variables (do not modify)
 DATE_FORMAT="%F_%H-%M-%S"
 TIMESTAMP=$(date +$DATE_FORMAT)
 
-while getopts 'a:cd:e:f:hi:l:m:o:p:qs:v' FLAG; do
+while getopts 'a:cd:e:f:hi:l:m:o:p:qs:vw:' FLAG; do
   case $FLAG in
     a) COMPRESSION_ALGORITHM=$OPTARG ;;
     c) ENABLE_CHAT_MESSAGES=true ;;
@@ -47,6 +48,7 @@ while getopts 'a:cd:e:f:hi:l:m:o:p:qs:v' FLAG; do
        echo "-q    Suppress warnings"
        echo "-s    Minecraft server screen name"
        echo "-v    Verbose mode"
+       echo "-w    Window manager: screen (default) or tmux"
        exit 0
        ;;
     i) SERVER_WORLD=$OPTARG ;;
@@ -57,6 +59,7 @@ while getopts 'a:cd:e:f:hi:l:m:o:p:qs:v' FLAG; do
     q) SUPPRESS_WARNINGS=true ;;
     s) SCREEN_NAME=$OPTARG ;;
     v) DEBUG=true ;;
+    w) WINDOW_MANAGER=$OPTARG ;;
   esac
 done
 
@@ -100,7 +103,12 @@ message-players () {
 execute-command () {
   local COMMAND=$1
   if [[ $SCREEN_NAME != "" ]]; then
-    screen -S $SCREEN_NAME -p 0 -X stuff "$COMMAND$(printf \\r)"
+    case $WINDOW_MANAGER in
+      "screen") screen -S $SCREEN_NAME -p 0 -X stuff "$COMMAND$(printf \\r)"
+        ;;
+      "tmux") tmux send-keys -t $SCREEN_NAME "$COMMAND" ENTER
+        ;;
+    esac
   fi
 }
 message-players-error () {
