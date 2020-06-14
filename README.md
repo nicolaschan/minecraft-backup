@@ -1,5 +1,5 @@
 # Minecraft Backup
-Backup script for Linux servers running a Minecraft server in a GNU Screen
+Backup script for Linux servers running a Minecraft server in a GNU Screen or tmux
 
 ### Disclaimer
 Backups are essential to the integrity of your Minecraft world. You should automate regular backups and **check that your backups work**. While this script has been used in production for several years, it is up to you to make sure that your backups work and that you have a reliable backup policy. 
@@ -40,6 +40,7 @@ Command line options:
 -q    Suppress warnings
 -s    Minecraft server screen name
 -v    Verbose mode
+-w    Window manager: screen (default) or tmux
 ```
 
 Example usage of command line options:
