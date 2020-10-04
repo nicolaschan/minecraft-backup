@@ -72,7 +72,7 @@ log-warning () {
 
 # Check for missing encouraged arguments
 if ! $SUPPRESS_WARNINGS; then
-  if [[ $SCREEN_NAME == "" ]]; then
+  if $ENABLE_CHAT_MESSAGES && [[ $SCREEN_NAME == "" ]]; then
     log-warning "Minecraft screen name not specified (use -s)"
   fi
 fi
@@ -194,7 +194,7 @@ delete-thinning () {
 
   # Warn if $MAX_BACKUPS does not have enough room for all the blocks
   TOTAL_BLOCK_SIZE=$(array-sum ${BLOCK_SIZES[@]})
-  if [[ $TOTAL_BLOCK_SIZE -gt $MAX_BACKUPS ]]; then
+  if [[  $MAX_BACKUPS != -1 ]] && [[ $TOTAL_BLOCK_SIZE -gt $MAX_BACKUPS ]]; then
     if ! $SUPPRESS_WARNINGS; then
       log-warning "MAX_BACKUPS ($MAX_BACKUPS) is smaller than TOTAL_BLOCK_SIZE ($TOTAL_BLOCK_SIZE)"
     fi
