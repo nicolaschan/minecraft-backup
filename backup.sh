@@ -72,7 +72,7 @@ log-warning () {
 
 # Check for missing encouraged arguments
 if ! $SUPPRESS_WARNINGS; then
-  if $ENABLE_CHAT_MESSAGES && [[ $SCREEN_NAME == "" ]]; then
+  if [[ $SCREEN_NAME == "" ]]; then
     log-warning "Minecraft screen name not specified (use -s)"
   fi
 fi
