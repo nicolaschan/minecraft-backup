@@ -7,7 +7,7 @@
 # For Minecraft servers running in a GNU screen.
 # For most convenience, run automatically with cron.
 
-# Default Configuration 
+# Default Configuration
 SCREEN_NAME="" # Name of the GNU Screen or tmux pane your Minecraft server is running in
 SERVER_WORLD="" # Server world directory
 BACKUP_DIRECTORY="" # Directory to save backups in
@@ -134,9 +134,10 @@ message-players-color () {
 }
 
 # Notify players of start
-message-players "Starting backup..." "$ARCHIVE_FILE_NAME"
+WORLD=$(basename $SERVER_WORLD)
+message-players "Starting ${WORLD} backup..." "$ARCHIVE_FILE_NAME"
 
-# Parse file timestamp to one readable by "date" 
+# Parse file timestamp to one readable by "date"
 parse-file-timestamp () {
   local DATE_STRING=$(echo $1 | awk -F_ '{gsub(/-/,":",$2); print $1" "$2}')
   echo $DATE_STRING
@@ -206,7 +207,7 @@ delete-thinning () {
   for BLOCK_INDEX in ${!BLOCK_SIZES[@]}; do
     local BLOCK_SIZE=${BLOCK_SIZES[BLOCK_INDEX]}
     local BLOCK_FUNCTION=${BLOCK_FUNCTIONS[BLOCK_INDEX]}
-    local OLDEST_BACKUP_IN_BLOCK_INDEX=$((BLOCK_SIZE + CURRENT_INDEX)) # Not an off-by-one error because a new backup was already saved 
+    local OLDEST_BACKUP_IN_BLOCK_INDEX=$((BLOCK_SIZE + CURRENT_INDEX)) # Not an off-by-one error because a new backup was already saved
     local OLDEST_BACKUP_IN_BLOCK=${BACKUPS[OLDEST_BACKUP_IN_BLOCK_INDEX]}
 
     if [[ $OLDEST_BACKUP_IN_BLOCK == "" ]]; then
@@ -219,7 +220,7 @@ delete-thinning () {
     if $BLOCK_COMMAND; then
       # Oldest backup in this block satisfies the condition for placement in the next block
       if $DEBUG; then
-        echo "$OLDEST_BACKUP_IN_BLOCK promoted to next block" 
+        echo "$OLDEST_BACKUP_IN_BLOCK promoted to next block"
       fi
     else
       # Oldest backup in this block does not satisfy the condition for placement in next block
@@ -275,8 +276,8 @@ TIME_DELTA=$((END_TIME - START_TIME))
 
 # Check that archive size is not null and at least 1024 KB
 if [[ "$ARCHIVE_SIZE" != "" && "$ARCHIVE_SIZE_BYTES" -gt 8 ]]; then
-  message-players-success "Backup complete!" "$TIME_DELTA s, $ARCHIVE_SIZE/$BACKUP_DIRECTORY_SIZE, $COMPRESSION_PERCENT%"
+  message-players-success "${WORLD} backup complete!" "$TIME_DELTA s, $ARCHIVE_SIZE/$BACKUP_DIRECTORY_SIZE, $COMPRESSION_PERCENT%"
   delete-old-backups
 else
-  message-players-error "Backup was not saved!" "Please notify an administrator"
+  message-players-error "${WORLD} backup was not saved!" "Please notify an administrator"
 fi
