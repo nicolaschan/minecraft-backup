@@ -34,4 +34,11 @@ jobs:
         run: test/test.sh
 
       - name: Run coverage
-        run: kcov --include-pattern=backup.sh $(pwd)/coverage test/test.sh
+        run: kcov --include-pattern=backup.sh "$(pwd)"/coverage test/test.sh
+        
+      - name: Codecov
+        uses: codecov/codecov-action@v1.2.1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          file: ./coverage/test.sh/cov.xml
+        
