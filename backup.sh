@@ -314,7 +314,7 @@ array-sum () {
 
 # Given two exit codes, print a nonzero one if there is one
 exit-code () {
-  if [ "$1" -ne 0 ]; then
+  if [[ "$1" != "0" ]]; then
     echo "$1"
   else
     if [[ "$2" == "" ]]; then
