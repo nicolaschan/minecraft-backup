@@ -23,8 +23,8 @@ jobs:
         with:
           submodules: 'recursive'
 
-      - name: Install kcov
-        run: sudo apt-get install -y kcov
+      - name: Install kcov and shellcheck
+        run: sudo apt-get install -y kcov shellcheck
 
       - name: Run tests
         run: test/test.sh
@@ -37,4 +37,7 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           file: ./coverage/test.sh/cov.xml
+
+      - name: shellcheck
+        run: shellcheck backup.sh
         
