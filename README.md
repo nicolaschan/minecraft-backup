@@ -8,11 +8,11 @@ Supports servers running in [screen](https://en.wikipedia.org/wiki/GNU_Screen), 
 ## Features
 - Create backups of your world folder
 - Manage deletion of old backups
-  - "thin" - keep last 24 hourly, last 30 daily, and use remaining space for monthly backups
+  - "thin" - keep last 24 hourly, last 30 daily, and use remaining space for weekly backups
   - "sequential" - delete oldest backup
 - Choose your own compression algorithm (tested with: `gzip`, `xz`, `zstd`)
-- Works on vanilla -- no plugins required
-- Able to print backup status and info to the Minecraft chat
+- Works on vanilla (no plugins required)
+- Print backup status to the Minecraft chat
 
 ## Install
 ```bash
