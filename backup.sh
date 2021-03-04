@@ -8,7 +8,7 @@
 # For most convenience, run automatically with cron.
 
 # Default Configuration 
-SCREEN_NAME="" # Name of the GNU Screen or tmux pane your Minecraft server is running in
+SCREEN_NAME="" # Name of the GNU Screen, tmux session, or hostname:port:password for RCON
 SERVER_WORLD="" # Server world directory
 BACKUP_DIRECTORY="" # Directory to save backups in
 MAX_BACKUPS=128 # -1 indicates unlimited
@@ -20,7 +20,7 @@ ENABLE_CHAT_MESSAGES=false # Tell players in Minecraft chat about backup status
 PREFIX="Backup" # Shows in the chat message
 DEBUG=false # Enable debug messages
 SUPPRESS_WARNINGS=false # Suppress warnings
-WINDOW_MANAGER="screen" # Choices: screen, tmux
+WINDOW_MANAGER="screen" # Choices: screen, tmux, RCON
 
 # Other Variables (do not modify)
 DATE_FORMAT="%F_%H-%M-%S"
