@@ -311,7 +311,7 @@ array-sum () {
 
 # Given two exit codes, print a nonzero one if there is one
 exit-code () {
-  if [ $1 -ne 0 ]; then
+  if [ "$1" -ne 0 ]; then
     echo "$1"
   else
     if [[ "$2" == "" ]]; then
@@ -388,7 +388,7 @@ case $COMPRESSION_ALGORITHM in
     ;;
 esac
 ARCHIVE_EXIT_CODE="$(exit-code "${PIPESTATUS[0]}" "${PIPESTATUS[1]}")"
-if [ $ARCHIVE_EXIT_CODE -ne 0 ]; then
+if [ "$ARCHIVE_EXIT_CODE" -ne 0 ]; then
   log-fatal "Archive command exited with nonzero exit code $ARCHIVE_EXIT_CODE"
 fi
 sync
