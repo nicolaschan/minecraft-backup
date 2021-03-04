@@ -12,7 +12,7 @@ on:
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
   # This workflow contains a single job called "build"
-  build:
+  test:
     # The type of runner that the job will run on
     runs-on: ubuntu-latest
 
@@ -23,8 +23,8 @@ jobs:
         with:
           submodules: 'recursive'
 
-      - name: Install kcov
-        run: sudo apt-get install -y kcov
+      - name: Install kcov and shellcheck
+        run: sudo apt-get install -y kcov shellcheck
 
       - name: Run tests
         run: test/test.sh
@@ -37,4 +37,7 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           file: ./coverage/test.sh/cov.xml
+
+      - name: shellcheck
+        run: shellcheck backup.sh
         

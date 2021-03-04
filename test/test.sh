@@ -5,6 +5,8 @@
 TEST_DIR="test"
 TEST_TMP="$TEST_DIR/tmp"
 SCREEN_TMP="tmp-screen"
+RCON_PORT="8088"
+RCON_PASSWORD="supersecret"
 setUp () {
   rm -rf "$TEST_TMP"
   mkdir -p "$TEST_TMP/server/world"
@@ -17,10 +19,17 @@ setUp () {
   screen -S "$SCREEN_TMP" -X stuff "cat > $TEST_TMP/screen-output\n"
   tmux new-session -d -s "$SCREEN_TMP"
   tmux send-keys -t "$SCREEN_TMP" "cat > $TEST_TMP/tmux-output" ENTER
-  sleep 0.5
+  python test/mock_rcon.py "$RCON_PORT" "$RCON_PASSWORD" > "$TEST_TMP/rcon-output" &
+  echo "$!" > "$TEST_TMP/rcon-pid"
+
+  while ! [[ (-f "$TEST_TMP/screen-output")  && (-f "$TEST_TMP/tmux-output") && (-f "$TEST_TMP/rcon-output") ]]; do
+    sleep 0.1
+  done
 }
 
 tearDown () {
+  RCON_PID="$(cat "$TEST_TMP/rcon-pid")"
+  kill "$RCON_PID" >/dev/null 2>&1 || true
   screen -S "$SCREEN_TMP" -X quit >/dev/null 2>&1 || true
   tmux kill-session -t "$SCREEN_TMP" >/dev/null 2>&1 || true
 }
@@ -35,12 +44,18 @@ assert-equals-directory () {
   fi
 }
 
+check-backup-full-paths () {
+  BACKUP_ARCHIVE="$1"
+  WORLD_DIR="$2"
+  mkdir -p "$TEST_TMP/restored"
+  tar --extract --file "$BACKUP_ARCHIVE" --directory "$TEST_TMP/restored"
+  assert-equals-directory "$WORLD_DIR" "$TEST_TMP/restored"
+  rm -rf "$TEST_TMP/restored"
+}
+
 check-backup () {
   BACKUP_ARCHIVE="$1"
-  mkdir -p "$TEST_TMP/restored"
-  tar --extract --file "$TEST_TMP/backups/$BACKUP_ARCHIVE" --directory "$TEST_TMP/restored"
-  assert-equals-directory "$TEST_TMP/server/world" "$TEST_TMP/restored"
-  rm -rf "$TEST_TMP/restored"
+  check-backup-full-paths "$TEST_TMP/backups/$BACKUP_ARCHIVE" "$TEST_TMP/server/world"
 }
 
 # Tests
@@ -49,6 +64,17 @@ test-backup-defaults () {
   TIMESTAMP="$(date +%F_%H-%M-%S --date="2021-01-01")"
   ./backup.sh -i "$TEST_TMP/server/world" -o "$TEST_TMP/backups" -s "$SCREEN_TMP" -f "$TIMESTAMP"
   check-backup "$TIMESTAMP.tar.gz"
+}
+
+test-backup-spaces-in-directory () {
+  TIMESTAMP="$(date +%F_%H-%M-%S --date="2021-01-01")"
+  WORLD_SPACES="$TEST_TMP/minecraft server/the world"
+  mkdir -p "$(dirname "$WORLD_SPACES")"
+  BACKUP_SPACES="$TEST_TMP/My Backups"
+  mkdir -p "$BACKUP_SPACES"
+  cp -r "$TEST_TMP/server/world" "$WORLD_SPACES"
+  ./backup.sh -i "$WORLD_SPACES" -o "$BACKUP_SPACES" -s "$SCREEN_TMP" -f "$TIMESTAMP"
+  check-backup-full-paths "$BACKUP_SPACES/$TIMESTAMP.tar.gz" "$WORLD_SPACES"
 }
 
 test-backup-no-compression () {
@@ -88,7 +114,7 @@ test-missing-options () {
   OUTPUT="$(./backup.sh 2>&1)"
   EXIT_CODE="$?"
   assertEquals 1 "$EXIT_CODE"
-  assertContains "$OUTPUT" "Minecraft screen name not specified"
+  assertContains "$OUTPUT" "Minecraft screen/tmux/rcon location not specified (use -s)"
   assertContains "$OUTPUT" "Server world not specified"
   assertContains "$OUTPUT" "Backup directory not specified"
 }
@@ -97,7 +123,14 @@ test-missing-options-suppress-warnings () {
   OUTPUT="$(./backup.sh -q 2>&1)"
   EXIT_CODE="$?"
   assertEquals 1 "$EXIT_CODE"
-  assertNotContains "$OUTPUT" "Minecraft screen name not specified"
+  assertNotContains "$OUTPUT" "Minecraft screen/tmux/rcon location not specified (use -s)"
+}
+
+test-invalid-options () {
+  OUTPUT="$(./backup.sh -z 2>&1)"
+  EXIT_CODE="$?"
+  assertEquals 1 "$EXIT_CODE"
+  assertContains "$OUTPUT" "Invalid option"
 }
 
 test-empty-world-warning () {
@@ -111,6 +144,14 @@ test-block-size-warning () {
   OUTPUT="$(./backup.sh -m 10 -i "$TEST_TMP/server/world" -o "$TEST_TMP/backups" -s "$SCREEN_TMP" -f "$TIMESTAMP" 2>&1)"
   EXIT_CODE="$?"
   assertContains "$OUTPUT" "is smaller than TOTAL_BLOCK_SIZE"
+}
+
+test-nonzero-exit-warning () {
+  TIMESTAMP="$(date +%F_%H-%M-%S --date="2021-01-01")"
+  OUTPUT="$(./backup.sh -a _BLAH_ -i "$TEST_TMP/server/world" -o "$TEST_TMP/backups" -s "$SCREEN_TMP" -f "$TIMESTAMP" 2>&1)"
+  EXIT_CODE="$?"
+  assertNotEquals 0 "$EXIT_CODE"
+  assertContains "$OUTPUT" "Archive command exited with nonzero exit code"
 }
 
 test-screen-interface () {
@@ -129,6 +170,20 @@ test-tmux-interface () {
   assertEquals "$SCREEN_CONTENTS" "$EXPECTED_CONTENTS" 
 }
 
+test-rcon-interface () {
+  TIMESTAMP="$(date +%F_%H-%M-%S --date="2021-01-01")"
+  ./backup.sh -w rcon -i "$TEST_TMP/server/world" -o "$TEST_TMP/backups" -s "localhost:$RCON_PORT:$RCON_PASSWORD" -f "$TIMESTAMP"
+  EXPECTED_CONTENTS=$(echo -e "save-off\nsave-on\nsave-all") 
+  SCREEN_CONTENTS="$(head -n3 "$TEST_TMP/rcon-output")"
+  assertEquals "$SCREEN_CONTENTS" "$EXPECTED_CONTENTS" 
+}
+
+test-rcon-interface-wrong-password () {
+  TIMESTAMP="$(date +%F_%H-%M-%S --date="2021-01-01")"
+  OUTPUT="$(./backup.sh -w RCON -i "$TEST_TMP/server/world" -o "$TEST_TMP/backups" -s "localhost:$RCON_PORT:wrong$RCON_PASSWORD" -f "$TIMESTAMP" 2>&1)"
+  assertContains "$OUTPUT" "Wrong RCON password"
+}
+
 test-sequential-delete () {
   for i in $(seq 0 99); do
     TIMESTAMP="$(date +%F_%H-%M-%S --date="2021-01-01 +$i hour")"
@@ -138,6 +193,7 @@ test-sequential-delete () {
     TIMESTAMP="$(date +%F_%H-%M-%S --date="2021-01-01 +$i hour")"
     check-backup "$TIMESTAMP.tar.gz"
   done
+  assertEquals 10 "$(find "$TEST_TMP/backups" -type f | wc -l)" 
 }
 
 test-thinning-delete () {
