@@ -21,7 +21,10 @@ setUp () {
   tmux send-keys -t "$SCREEN_TMP" "cat > $TEST_TMP/tmux-output" ENTER
   python test/mock_rcon.py "$RCON_PORT" "$RCON_PASSWORD" > "$TEST_TMP/rcon-output" &
   echo "$!" > "$TEST_TMP/rcon-pid"
-  sleep 1
+
+  while ! [[ (-f "$TEST_TMP/screen-output")  && (-f "$TEST_TMP/tmux-output") && (-f "$TEST_TMP/rcon-output") ]]; do
+    sleep 0.1
+  done
 }
 
 tearDown () {
@@ -106,6 +109,13 @@ test-missing-options-suppress-warnings () {
   assertNotContains "$OUTPUT" "Minecraft screen/tmux/rcon location not specified (use -s)"
 }
 
+test-invalid-options () {
+  OUTPUT="$(./backup.sh -z 2>&1)"
+  EXIT_CODE="$?"
+  assertEquals 1 "$EXIT_CODE"
+  assertContains "$OUTPUT" "Invalid option"
+}
+
 test-empty-world-warning () {
   mkdir -p "$TEST_TMP/server/empty-world"
   OUTPUT="$(./backup.sh -v -i "$TEST_TMP/server/empty-world" -o "$TEST_TMP/backups" -s "$SCREEN_TMP" -f "$TIMESTAMP" 2>&1)"
@@ -158,6 +168,7 @@ test-sequential-delete () {
     TIMESTAMP="$(date +%F_%H-%M-%S --date="2021-01-01 +$i hour")"
     check-backup "$TIMESTAMP.tar.gz"
   done
+  assertEquals 10 "$(find "$TEST_TMP/backups" -type f | wc -l)" 
 }
 
 test-thinning-delete () {

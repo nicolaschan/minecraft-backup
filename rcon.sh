@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 
 rcon-command () {
-  HOST="$(echo $1 | cut -d: -f1)"
-  PORT="$(echo $1 | cut -d: -f2)"
-  PASSWORD="$(echo $1 | cut -d: -f3-)"
+  HOST="$(echo "$1" | cut -d: -f1)"
+  PORT="$(echo "$1" | cut -d: -f2)"
+  PASSWORD="$(echo "$1" | cut -d: -f3-)"
   COMMAND="$2"
 
   reverse-hex-endian () {

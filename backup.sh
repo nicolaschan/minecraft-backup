@@ -26,6 +26,13 @@ WINDOW_MANAGER="screen" # Choices: screen, tmux
 DATE_FORMAT="%F_%H-%M-%S"
 TIMESTAMP=$(date +$DATE_FORMAT)
 
+log-fatal () {
+  echo -e "\033[0;31mFATAL:\033[0m $*"
+}
+log-warning () {
+  echo -e "\033[0;33mWARNING:\033[0m $*"
+}
+
 while getopts 'a:cd:e:f:hi:l:m:o:p:qs:vw:' FLAG; do
   case $FLAG in
     a) COMPRESSION_ALGORITHM=$OPTARG ;;
@@ -61,20 +68,14 @@ while getopts 'a:cd:e:f:hi:l:m:o:p:qs:vw:' FLAG; do
     s) SCREEN_NAME=$OPTARG ;;
     v) DEBUG=true ;;
     w) WINDOW_MANAGER=$OPTARG ;;
+    *) log-fatal "Invalid option -$FLAG"; exit 1 ;;
   esac
 done
 
-log-fatal () {
-  echo -e "\033[0;31mFATAL:\033[0m $*"
-}
-log-warning () {
-  echo -e "\033[0;33mWARNING:\033[0m $*"
-}
-
 rcon-command () {
-  HOST="$(echo $1 | cut -d: -f1)"
-  PORT="$(echo $1 | cut -d: -f2)"
-  PASSWORD="$(echo $1 | cut -d: -f3-)"
+  HOST="$(echo "$1" | cut -d: -f1)"
+  PORT="$(echo "$1" | cut -d: -f2)"
+  PASSWORD="$(echo "$1" | cut -d: -f3-)"
   COMMAND="$2"
 
   reverse-hex-endian () {
@@ -255,50 +256,54 @@ message-players "Starting backup..." "$ARCHIVE_FILE_NAME"
 
 # Parse file timestamp to one readable by "date" 
 parse-file-timestamp () {
-  local DATE_STRING=$(echo $1 | awk -F_ '{gsub(/-/,":",$2); print $1" "$2}')
-  echo $DATE_STRING
+  local DATE_STRING
+  DATE_STRING="$(echo "$1" | awk -F_ '{gsub(/-/,":",$2); print $1" "$2}')"
+  echo "$DATE_STRING"
 }
 
 # Delete a backup
 delete-backup () {
   local BACKUP=$1
-  rm $BACKUP_DIRECTORY/$BACKUP
+  rm "$BACKUP_DIRECTORY"/"$BACKUP"
   message-players "Deleted old backup" "$BACKUP"
 }
 
 # Sequential delete method
 delete-sequentially () {
-  local BACKUPS=($(ls $BACKUP_DIRECTORY))
+  local BACKUPS=("$BACKUP_DIRECTORY"/*)
   while [[ $MAX_BACKUPS -ge 0 && ${#BACKUPS[@]} -gt $MAX_BACKUPS ]]; do
-    delete-backup ${BACKUPS[0]}
-    BACKUPS=($(ls $BACKUP_DIRECTORY))
+    delete-backup "$(basename "${BACKUPS[0]}")"
+    BACKUPS=("$BACKUP_DIRECTORY"/*)
   done
 }
 
 # Functions to sort backups into correct categories based on timestamps
 is-hourly-backup () {
   local TIMESTAMP=$*
-  local MINUTE=$(date -d "$TIMESTAMP" +%M)
-  return $MINUTE
+  local MINUTE
+  MINUTE=$(date -d "$TIMESTAMP" +%M)
+  return "$MINUTE"
 }
 is-daily-backup () {
   local TIMESTAMP=$*
-  local HOUR=$(date -d "$TIMESTAMP" +%H)
-  return $HOUR
+  local HOUR
+  HOUR=$(date -d "$TIMESTAMP" +%H)
+  return "$HOUR"
 }
 is-weekly-backup () {
   local TIMESTAMP=$*
-  local DAY=$(date -d "$TIMESTAMP" +%u)
-  return $((DAY - 1))
+  local DAY
+  DAY=$(date -d "$TIMESTAMP" +%u)
+  return "$((DAY - 1))"
 }
 
 # Helper function to sum an array
 array-sum () {
   SUM=0
-  for NUMBER in $*; do
+  for NUMBER in "$@"; do
     (( SUM += NUMBER ))
   done
-  echo $SUM
+  echo "$SUM"
 }
 
 # Thinning delete method
@@ -310,7 +315,7 @@ delete-thinning () {
   local BLOCK_FUNCTIONS=("is-hourly-backup" "is-daily-backup" "is-weekly-backup")
 
   # Warn if $MAX_BACKUPS does not have enough room for all the blocks
-  TOTAL_BLOCK_SIZE=$(array-sum ${BLOCK_SIZES[@]})
+  TOTAL_BLOCK_SIZE=$(array-sum "${BLOCK_SIZES[@]}")
   if [[  $MAX_BACKUPS != -1 ]] && [[ $TOTAL_BLOCK_SIZE -gt $MAX_BACKUPS ]]; then
     if ! $SUPPRESS_WARNINGS; then
       log-warning "MAX_BACKUPS ($MAX_BACKUPS) is smaller than TOTAL_BLOCK_SIZE ($TOTAL_BLOCK_SIZE)"
@@ -318,19 +323,21 @@ delete-thinning () {
   fi
 
   local CURRENT_INDEX=0
-  local BACKUPS=($(ls -r $BACKUP_DIRECTORY)) # List newest first
+  local BACKUPS=("$BACKUP_DIRECTORY"/*) # List newest first
 
-  for BLOCK_INDEX in ${!BLOCK_SIZES[@]}; do
+  for BLOCK_INDEX in "${!BLOCK_SIZES[@]}"; do
     local BLOCK_SIZE=${BLOCK_SIZES[BLOCK_INDEX]}
     local BLOCK_FUNCTION=${BLOCK_FUNCTIONS[BLOCK_INDEX]}
     local OLDEST_BACKUP_IN_BLOCK_INDEX=$((BLOCK_SIZE + CURRENT_INDEX)) # Not an off-by-one error because a new backup was already saved 
-    local OLDEST_BACKUP_IN_BLOCK=${BACKUPS[OLDEST_BACKUP_IN_BLOCK_INDEX]}
+    local OLDEST_BACKUP_IN_BLOCK
+    OLDEST_BACKUP_IN_BLOCK="$(basename "${BACKUPS[OLDEST_BACKUP_IN_BLOCK_INDEX]}")"
 
-    if [[ $OLDEST_BACKUP_IN_BLOCK == "" ]]; then
+    if [[ "$OLDEST_BACKUP_IN_BLOCK" == "" ]]; then
       break
     fi
 
-    local OLDEST_BACKUP_TIMESTAMP=$(parse-file-timestamp ${OLDEST_BACKUP_IN_BLOCK:0:19})
+    local OLDEST_BACKUP_TIMESTAMP
+    OLDEST_BACKUP_TIMESTAMP=$(parse-file-timestamp "${OLDEST_BACKUP_IN_BLOCK:0:19}")
     local BLOCK_COMMAND="$BLOCK_FUNCTION $OLDEST_BACKUP_TIMESTAMP"
 
     if $BLOCK_COMMAND; then
@@ -340,7 +347,7 @@ delete-thinning () {
       fi
     else
       # Oldest backup in this block does not satisfy the condition for placement in next block
-      delete-backup $OLDEST_BACKUP_IN_BLOCK
+      delete-backup "$OLDEST_BACKUP_IN_BLOCK"
       break
     fi
 
@@ -351,7 +358,7 @@ delete-thinning () {
 }
 
 # Ensure directory exists
-mkdir -p "$(dirname $ARCHIVE_PATH)"
+mkdir -p "$(dirname "$ARCHIVE_PATH")"
 
 # Disable world autosaving
 execute-command "save-off"
@@ -360,10 +367,10 @@ execute-command "save-off"
 START_TIME=$(date +"%s")
 case $COMPRESSION_ALGORITHM in
   # No compression
-  "") tar -cf $ARCHIVE_PATH -C $SERVER_WORLD . 
+  "") tar -cf "$ARCHIVE_PATH" -C "$SERVER_WORLD" .
     ;;
   # With compression
-  *) tar -cf - -C $SERVER_WORLD . | $COMPRESSION_ALGORITHM -cv -$COMPRESSION_LEVEL - > $ARCHIVE_PATH 2>> /dev/null
+  *) tar -cf - -C "$SERVER_WORLD" . | $COMPRESSION_ALGORITHM -cv -"$COMPRESSION_LEVEL" - > "$ARCHIVE_PATH" 2>> /dev/null
     ;;
 esac
 sync
@@ -386,15 +393,15 @@ delete-old-backups () {
 }
 
 # Notify players of completion
-WORLD_SIZE_BYTES=$(du -b --max-depth=0 $SERVER_WORLD | awk '{print $1}')
-ARCHIVE_SIZE_BYTES=$(du -b $ARCHIVE_PATH | awk '{print $1}')
-ARCHIVE_SIZE=$(du -h $ARCHIVE_PATH | awk '{print $1}')
-BACKUP_DIRECTORY_SIZE=$(du -h --max-depth=0 $BACKUP_DIRECTORY | awk '{print $1}')
+WORLD_SIZE_BYTES=$(du -b --max-depth=0 "$SERVER_WORLD" | awk '{print $1}')
+ARCHIVE_SIZE_BYTES=$(du -b "$ARCHIVE_PATH" | awk '{print $1}')
+ARCHIVE_SIZE=$(du -h "$ARCHIVE_PATH" | awk '{print $1}')
+BACKUP_DIRECTORY_SIZE=$(du -h --max-depth=0 "$BACKUP_DIRECTORY" | awk '{print $1}')
 TIME_DELTA=$((END_TIME - START_TIME))
 
 # Check that archive size is not null and at least 200 Bytes
 if [[ "$WORLD_SIZE_BYTES" -gt 0 && "$ARCHIVE_SIZE" != "" && "$ARCHIVE_SIZE_BYTES" -gt 200 ]]; then
-  COMPRESSION_PERCENT=$(($ARCHIVE_SIZE_BYTES * 100 / $WORLD_SIZE_BYTES))
+  COMPRESSION_PERCENT=$((ARCHIVE_SIZE_BYTES * 100 / WORLD_SIZE_BYTES))
   message-players-success "Backup complete!" "$TIME_DELTA s, $ARCHIVE_SIZE/$BACKUP_DIRECTORY_SIZE, $COMPRESSION_PERCENT%"
   delete-old-backups
 else
