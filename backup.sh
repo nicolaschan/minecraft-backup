@@ -1,7 +1,7 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Minecraft server automatic backup management script
-# by Nicolas Chan
+# https://github.com/nicolaschan/minecraft-backup
 # MIT License
 #
 # For Minecraft servers running in a GNU screen.
@@ -33,7 +33,8 @@ while getopts 'a:cd:e:f:hi:l:m:o:p:qs:vw:' FLAG; do
     d) DELETE_METHOD=$OPTARG ;;
     e) COMPRESSION_FILE_EXTENSION=".$OPTARG" ;;
     f) TIMESTAMP=$OPTARG ;;
-    h) echo "Minecraft Backup (by Nicolas Chan)"
+    h) echo "Minecraft Backup"
+       echo "Repository: https://github.com/nicolaschan/minecraft-backup"
        echo "-a    Compression algorithm (default: gzip)"
        echo "-c    Enable chat messages"
        echo "-d    Delete method: thin (default), sequential, none"
@@ -70,6 +71,10 @@ log-warning () {
   echo -e "\033[0;33mWARNING:\033[0m $*"
 }
 
+if [[ $COMPRESSION_FILE_EXTENSION == "." ]]; then
+  COMPRESSION_FILE_EXTENSION=""
+fi
+
 # Check for missing encouraged arguments
 if ! $SUPPRESS_WARNINGS; then
   if [[ $SCREEN_NAME == "" ]]; then
@@ -88,7 +93,7 @@ if [[ $BACKUP_DIRECTORY == "" ]]; then
 fi
 
 if $MISSING_CONFIGURATION; then
-  exit 0
+  exit 1
 fi
 
 ARCHIVE_FILE_NAME=$TIMESTAMP.tar$COMPRESSION_FILE_EXTENSION
@@ -239,11 +244,11 @@ execute-command "save-off"
 # Backup world
 START_TIME=$(date +"%s")
 case $COMPRESSION_ALGORITHM in
-  "") # No compression
-    tar -cf $ARCHIVE_PATH -C $SERVER_WORLD .
+  # No compression
+  "") tar -cf $ARCHIVE_PATH -C $SERVER_WORLD . 
     ;;
-  *) # With compression
-    tar -cf - -C $SERVER_WORLD . | $COMPRESSION_ALGORITHM -cv -$COMPRESSION_LEVEL - > $ARCHIVE_PATH 2>> /dev/null
+  # With compression
+  *) tar -cf - -C $SERVER_WORLD . | $COMPRESSION_ALGORITHM -cv -$COMPRESSION_LEVEL - > $ARCHIVE_PATH 2>> /dev/null
     ;;
 esac
 sync
@@ -268,13 +273,13 @@ delete-old-backups () {
 # Notify players of completion
 WORLD_SIZE_BYTES=$(du -b --max-depth=0 $SERVER_WORLD | awk '{print $1}')
 ARCHIVE_SIZE_BYTES=$(du -b $ARCHIVE_PATH | awk '{print $1}')
-COMPRESSION_PERCENT=$(($ARCHIVE_SIZE_BYTES * 100 / $WORLD_SIZE_BYTES))
 ARCHIVE_SIZE=$(du -h $ARCHIVE_PATH | awk '{print $1}')
 BACKUP_DIRECTORY_SIZE=$(du -h --max-depth=0 $BACKUP_DIRECTORY | awk '{print $1}')
 TIME_DELTA=$((END_TIME - START_TIME))
 
-# Check that archive size is not null and at least 1024 KB
-if [[ "$ARCHIVE_SIZE" != "" && "$ARCHIVE_SIZE_BYTES" -gt 8 ]]; then
+# Check that archive size is not null and at least 200 Bytes
+if [[ "$WORLD_SIZE_BYTES" -gt 0 && "$ARCHIVE_SIZE" != "" && "$ARCHIVE_SIZE_BYTES" -gt 200 ]]; then
+  COMPRESSION_PERCENT=$(($ARCHIVE_SIZE_BYTES * 100 / $WORLD_SIZE_BYTES))
   message-players-success "Backup complete!" "$TIME_DELTA s, $ARCHIVE_SIZE/$BACKUP_DIRECTORY_SIZE, $COMPRESSION_PERCENT%"
   delete-old-backups
 else
