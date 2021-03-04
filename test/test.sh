@@ -44,12 +44,18 @@ assert-equals-directory () {
   fi
 }
 
+check-backup-full-paths () {
+  BACKUP_ARCHIVE="$1"
+  WORLD_DIR="$2"
+  mkdir -p "$TEST_TMP/restored"
+  tar --extract --file "$BACKUP_ARCHIVE" --directory "$TEST_TMP/restored"
+  assert-equals-directory "$WORLD_DIR" "$TEST_TMP/restored"
+  rm -rf "$TEST_TMP/restored"
+}
+
 check-backup () {
   BACKUP_ARCHIVE="$1"
-  mkdir -p "$TEST_TMP/restored"
-  tar --extract --file "$TEST_TMP/backups/$BACKUP_ARCHIVE" --directory "$TEST_TMP/restored"
-  assert-equals-directory "$TEST_TMP/server/world" "$TEST_TMP/restored"
-  rm -rf "$TEST_TMP/restored"
+  check-backup-full-paths "$TEST_TMP/backups/$BACKUP_ARCHIVE" "$TEST_TMP/server/world"
 }
 
 # Tests
@@ -58,6 +64,17 @@ test-backup-defaults () {
   TIMESTAMP="$(date +%F_%H-%M-%S --date="2021-01-01")"
   ./backup.sh -i "$TEST_TMP/server/world" -o "$TEST_TMP/backups" -s "$SCREEN_TMP" -f "$TIMESTAMP"
   check-backup "$TIMESTAMP.tar.gz"
+}
+
+test-backup-spaces-in-directory () {
+  TIMESTAMP="$(date +%F_%H-%M-%S --date="2021-01-01")"
+  WORLD_SPACES="$TEST_TMP/minecraft server/the world"
+  mkdir -p "$(dirname "$WORLD_SPACES")"
+  BACKUP_SPACES="$TEST_TMP/My Backups"
+  mkdir -p "$BACKUP_SPACES"
+  cp -r "$TEST_TMP/server/world" "$WORLD_SPACES"
+  ./backup.sh -i "$WORLD_SPACES" -o "$BACKUP_SPACES" -s "$SCREEN_TMP" -f "$TIMESTAMP"
+  check-backup-full-paths "$BACKUP_SPACES/$TIMESTAMP.tar.gz" "$WORLD_SPACES"
 }
 
 test-backup-no-compression () {
