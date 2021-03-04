@@ -3,7 +3,7 @@
 [![codecov](https://codecov.io/gh/nicolaschan/minecraft-backup/branch/master/graph/badge.svg?token=LCbVC4TbYJ)](https://codecov.io/gh/nicolaschan/minecraft-backup)
 
 Backup script for Minecraft servers on Linux. 
-Supports servers running in [screen](https://en.wikipedia.org/wiki/GNU_Screen), [tmux](https://en.wikipedia.org/wiki/Tmux), or with [rcon](https://wiki.vg/RCON) enabled.
+Supports servers running in [screen](https://en.wikipedia.org/wiki/GNU_Screen), [tmux](https://en.wikipedia.org/wiki/Tmux), or with [RCON](https://wiki.vg/RCON) enabled.
 
 ## Features
 - Create backups of your world folder
@@ -40,9 +40,9 @@ Command line options:
 -o    Output directory
 -p    Prefix that shows in Minecraft chat (default: Backup)
 -q    Suppress warnings
--s    Minecraft server screen name
+-s    Screen name, tmux session name, or hostname:port:password for RCON
 -v    Verbose mode
--w    Window manager: screen (default) or tmux
+-w    Window manager: screen (default), tmux, RCON 
 ```
 
 ### Automate backups with cron

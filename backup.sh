@@ -47,9 +47,9 @@ while getopts 'a:cd:e:f:hi:l:m:o:p:qs:vw:' FLAG; do
        echo "-o    Output directory"
        echo "-p    Prefix that shows in Minecraft chat (default: Backup)"
        echo "-q    Suppress warnings"
-       echo "-s    Screen name, tmux session name, or hostname:port:password for rcon"
+       echo "-s    Screen name, tmux session name, or hostname:port:password for RCON"
        echo "-v    Verbose mode"
-       echo "-w    Window manager: screen (default), tmux, rcon"
+       echo "-w    Window manager: screen (default), tmux, RCON"
        exit 0
        ;;
     i) SERVER_WORLD=$OPTARG ;;
