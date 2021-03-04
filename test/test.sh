@@ -15,12 +15,12 @@ setUp () {
   echo "file2" > "$TEST_TMP/server/world/file2.txt"
   echo "file3" > "$TEST_TMP/server/world/file3.txt"
 
-  python test/mock_rcon.py "$RCON_PORT" "$RCON_PASSWORD" > "$TEST_TMP/rcon-output" &
-  echo "$!" > "$TEST_TMP/rcon-pid"
   screen -dmS "$SCREEN_TMP" bash
   screen -S "$SCREEN_TMP" -X stuff "cat > $TEST_TMP/screen-output\n"
   tmux new-session -d -s "$SCREEN_TMP"
   tmux send-keys -t "$SCREEN_TMP" "cat > $TEST_TMP/tmux-output" ENTER
+  python test/mock_rcon.py "$RCON_PORT" "$RCON_PASSWORD" > "$TEST_TMP/rcon-output" &
+  echo "$!" > "$TEST_TMP/rcon-pid"
   sleep 1
 }
 
