@@ -19,6 +19,9 @@ wget https://raw.githubusercontent.com/nicolaschan/minecraft-backup/master/backu
 chmod +x backup.sh
 ```
 
+Make sure your system has `tar` and your chosen compression algorithm (`gzip` by default) installed.
+If using RCON, you will also need to have the [`xxd`](https://linux.die.net/man/1/xxd) command.
+
 ## Usage
 ```bash
 # If connecting with RCON:
