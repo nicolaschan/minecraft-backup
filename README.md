@@ -33,7 +33,7 @@ This script will take care of disabling and then re-enabling autosaving for you,
 
 ## Quick Start
 ```bash
-wget https://raw.githubusercontent.com/nicolaschan/minecraft-backup/master/backup.sh`
+wget https://raw.githubusercontent.com/nicolaschan/minecraft-backup/master/backup.sh
 chmod +x backup.sh
 ```
 
@@ -58,9 +58,9 @@ Command line options:
 
 Example usage of command line options:
 ```bash
-./backup.sh -c -i /home/server/minecraft-server/world -o /mnt/external-storage/minecraft-backups -s minecraft
+./backup.sh -c -i /home/nicolas/mcserver/world -o /mnt/storage/backups -s minecraft
 ```
-This will show chat messages (`-c`) in the screen called "minecraft" and save a backup of `/home/server/minecraft-server/world` into `/mnt/external-storage/minecraft-backups` using the default thinning delete policy for old backups.
+This will show chat messages (`-c`) in the screen called "minecraft" and save a backup of `/home/nicolas/mcserver/world` into `/mnt/storage/backups` using the default thinning deletion policy for old backups.
 
 ### Create a cron job to automatically backup:
 - Edit the crontab with `crontab -e`
