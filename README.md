@@ -21,7 +21,14 @@ chmod +x backup.sh
 
 ## Usage
 ```bash
+# If connecting with RCON:
+./backup.sh -c -i /home/user/mcserver/world -o /mnt/storage/backups -s localhost:25575:secret -w rcon
+
+# If running on screen called "minecraft":
 ./backup.sh -c -i /home/user/mcserver/world -o /mnt/storage/backups -s minecraft
+
+# If running on tmux session 0:
+./backup.sh -c -i /home/user/mcserver/world -o /mnt/storage/backups -s 0 -w tmux 
 ```
 
 This will show chat messages (`-c`) in the screen called "minecraft" and save a backup of `/home/user/mcserver/world` into `/mnt/storage/backups` using the default thinning deletion policy for old backups.
