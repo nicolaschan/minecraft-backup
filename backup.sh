@@ -223,7 +223,7 @@ execute-command () {
         ;;
       "tmux") tmux send-keys -t "$SCREEN_NAME" "$COMMAND" ENTER
         ;;
-      "rcon") rcon-command "$SCREEN_NAME" "$COMMAND"
+      "RCON"|"rcon") rcon-command "$SCREEN_NAME" "$COMMAND"
         ;;
     esac
   fi

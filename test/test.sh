@@ -21,7 +21,7 @@ setUp () {
   screen -S "$SCREEN_TMP" -X stuff "cat > $TEST_TMP/screen-output\n"
   tmux new-session -d -s "$SCREEN_TMP"
   tmux send-keys -t "$SCREEN_TMP" "cat > $TEST_TMP/tmux-output" ENTER
-  sleep 0.5
+  sleep 1
 }
 
 tearDown () {
@@ -145,7 +145,7 @@ test-rcon-interface () {
 
 test-rcon-interface-wrong-password () {
   TIMESTAMP="$(date +%F_%H-%M-%S --date="2021-01-01")"
-  OUTPUT="$(./backup.sh -w rcon -i "$TEST_TMP/server/world" -o "$TEST_TMP/backups" -s "localhost:$RCON_PORT:wrong$RCON_PASSWORD" -f "$TIMESTAMP" 2>&1)"
+  OUTPUT="$(./backup.sh -w RCON -i "$TEST_TMP/server/world" -o "$TEST_TMP/backups" -s "localhost:$RCON_PORT:wrong$RCON_PASSWORD" -f "$TIMESTAMP" 2>&1)"
   assertContains "$OUTPUT" "Wrong RCON password"
 }
 
