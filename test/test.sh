@@ -23,7 +23,7 @@ setUp () {
   echo "$!" > "$TEST_TMP/rcon-pid"
 
   while ! [[ (-f "$TEST_TMP/screen-output")  && (-f "$TEST_TMP/tmux-output") && (-f "$TEST_TMP/rcon-output") ]]; do
-    sleep 0.2
+    sleep 0.3
   done
 }
 
@@ -159,7 +159,7 @@ test-screen-interface () {
   ./backup.sh -i "$TEST_TMP/server/world" -o "$TEST_TMP/backups" -s "$SCREEN_TMP" -f "$TIMESTAMP"
   EXPECTED_CONTENTS=$(echo -e "save-off\nsave-on\nsave-all") 
   SCREEN_CONTENTS="$(cat "$TEST_TMP/screen-output")"
-  assertEquals "$SCREEN_CONTENTS" "$EXPECTED_CONTENTS" 
+  assertEquals "$EXPECTED_CONTENTS" "$SCREEN_CONTENTS" 
 }
 
 test-tmux-interface () {
@@ -167,7 +167,7 @@ test-tmux-interface () {
   ./backup.sh -w tmux -i "$TEST_TMP/server/world" -o "$TEST_TMP/backups" -s "$SCREEN_TMP" -f "$TIMESTAMP"
   EXPECTED_CONTENTS=$(echo -e "save-off\nsave-on\nsave-all") 
   SCREEN_CONTENTS="$(cat "$TEST_TMP/tmux-output")"
-  assertEquals "$SCREEN_CONTENTS" "$EXPECTED_CONTENTS" 
+  assertEquals "$EXPECTED_CONTENTS" "$SCREEN_CONTENTS" 
 }
 
 test-rcon-interface () {
@@ -175,13 +175,19 @@ test-rcon-interface () {
   ./backup.sh -w rcon -i "$TEST_TMP/server/world" -o "$TEST_TMP/backups" -s "localhost:$RCON_PORT:$RCON_PASSWORD" -f "$TIMESTAMP"
   EXPECTED_CONTENTS=$(echo -e "save-off\nsave-on\nsave-all") 
   SCREEN_CONTENTS="$(head -n3 "$TEST_TMP/rcon-output")"
-  assertEquals "$SCREEN_CONTENTS" "$EXPECTED_CONTENTS" 
+  assertEquals "$EXPECTED_CONTENTS" "$SCREEN_CONTENTS" 
 }
 
 test-rcon-interface-wrong-password () {
   TIMESTAMP="$(date +%F_%H-%M-%S --date="2021-01-01")"
   OUTPUT="$(./backup.sh -w RCON -i "$TEST_TMP/server/world" -o "$TEST_TMP/backups" -s "localhost:$RCON_PORT:wrong$RCON_PASSWORD" -f "$TIMESTAMP" 2>&1)"
   assertContains "$OUTPUT" "Wrong RCON password"
+}
+
+test-rcon-interface-not-running () {
+  TIMESTAMP="$(date +%F_%H-%M-%S --date="2021-01-01")"
+  OUTPUT="$(./backup.sh -w RCON -i "$TEST_TMP/server/world" -o "$TEST_TMP/backups" -s "@!@#:$RCON_PORT:$RCON_PASSWORD" -f "$TIMESTAMP" 2>&1)"
+  assertContains "$OUTPUT" "Could not connect"
 }
 
 test-sequential-delete () {

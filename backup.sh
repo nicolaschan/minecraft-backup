@@ -177,7 +177,10 @@ rcon-command () {
 
   # Open a TCP socket
   # Source: https://www.xmodulo.com/tcp-udp-socket-bash-shell.html
-  exec 3<>/dev/tcp/"$HOST"/"$PORT"
+  if ! exec 3<>/dev/tcp/"$HOST"/"$PORT"; then
+    log-warning "RCON connection failed: Could not connect to $HOST:$PORT"
+    return 1
+  fi
 
   login "$PASSWORD" || return 1
   debug-log "$(run-command "$COMMAND")"
@@ -371,6 +374,44 @@ delete-thinning () {
   delete-sequentially
 }
 
+# Delete old backups
+delete-old-backups () {
+  case $DELETE_METHOD in
+    "sequential") delete-sequentially
+      ;;
+    "thin") delete-thinning
+      ;;
+  esac
+}
+
+clean-up () {
+  # Re-enable world autosaving
+  execute-command "save-on"
+
+  # Save the world
+  execute-command "save-all"
+
+  # Notify players of completion
+  WORLD_SIZE_BYTES=$(du -b --max-depth=0 "$SERVER_WORLD" | awk '{print $1}')
+  ARCHIVE_SIZE_BYTES=$(du -b "$ARCHIVE_PATH" | awk '{print $1}')
+  ARCHIVE_SIZE=$(du -h "$ARCHIVE_PATH" | awk '{print $1}')
+  BACKUP_DIRECTORY_SIZE=$(du -h --max-depth=0 "$BACKUP_DIRECTORY" | awk '{print $1}')
+  TIME_DELTA=$((END_TIME - START_TIME))
+
+  # Check that archive size is not null and at least 200 Bytes
+  if [[ "$ARCHIVE_EXIT_CODE" == "0" && "$WORLD_SIZE_BYTES" -gt 0 && "$ARCHIVE_SIZE" != "" && "$ARCHIVE_SIZE_BYTES" -gt 200 ]]; then
+    COMPRESSION_PERCENT=$((ARCHIVE_SIZE_BYTES * 100 / WORLD_SIZE_BYTES))
+    message-players-success "Backup complete!" "$TIME_DELTA s, $ARCHIVE_SIZE/$BACKUP_DIRECTORY_SIZE, $COMPRESSION_PERCENT%"
+    delete-old-backups
+    exit 0
+  else
+    message-players-error "Backup was not saved!" "Please notify an administrator"
+    exit 1
+  fi
+}
+
+trap "clean-up" 2
+
 # Ensure backup directory exists
 mkdir -p "$(dirname "$ARCHIVE_PATH")"
 
@@ -394,39 +435,4 @@ fi
 sync
 END_TIME=$(date +"%s")
 
-# Enable world autosaving
-execute-command "save-on"
-
-# Save the world
-execute-command "save-all"
-
-# Delete old backups
-delete-old-backups () {
-  case $DELETE_METHOD in
-    "sequential") delete-sequentially
-      ;;
-    "thin") delete-thinning
-      ;;
-  esac
-}
-
-# Notify players of completion
-WORLD_SIZE_BYTES=$(du -b --max-depth=0 "$SERVER_WORLD" | awk '{print $1}')
-ARCHIVE_SIZE_BYTES=$(du -b "$ARCHIVE_PATH" | awk '{print $1}')
-ARCHIVE_SIZE=$(du -h "$ARCHIVE_PATH" | awk '{print $1}')
-BACKUP_DIRECTORY_SIZE=$(du -h --max-depth=0 "$BACKUP_DIRECTORY" | awk '{print $1}')
-TIME_DELTA=$((END_TIME - START_TIME))
-
-# Check that archive size is not null and at least 200 Bytes
-if [[ "$ARCHIVE_EXIT_CODE" -eq 0 && "$WORLD_SIZE_BYTES" -gt 0 && "$ARCHIVE_SIZE" != "" && "$ARCHIVE_SIZE_BYTES" -gt 200 ]]; then
-  COMPRESSION_PERCENT=$((ARCHIVE_SIZE_BYTES * 100 / WORLD_SIZE_BYTES))
-  message-players-success "Backup complete!" "$TIME_DELTA s, $ARCHIVE_SIZE/$BACKUP_DIRECTORY_SIZE, $COMPRESSION_PERCENT%"
-  delete-old-backups
-else
-  message-players-error "Backup was not saved!" "Please notify an administrator"
-  if [ "$ARCHIVE_EXIT_CODE" -ne 0 ]; then
-    exit "$ARCHIVE_EXIT_CODE"
-  else
-    exit 1
-  fi
-fi
+clean-up
