@@ -32,6 +32,11 @@ log-fatal () {
 log-warning () {
   echo -e "\033[0;33mWARNING:\033[0m $*"
 }
+debug-log () {
+  if "$DEBUG"; then
+    echo "$1"
+  fi
+}
 
 while getopts 'a:cd:e:f:hi:l:m:o:p:qs:vw:' FLAG; do
   case $FLAG in
@@ -175,7 +180,7 @@ rcon-command () {
   exec 3<>/dev/tcp/"$HOST"/"$PORT"
 
   login "$PASSWORD" || return 1
-  run-command "$COMMAND"
+  debug-log "$(run-command "$COMMAND")"
 
   # Close the socket
   exec 3<&-
@@ -243,9 +248,7 @@ message-players-color () {
   local MESSAGE=$1
   local HOVER_MESSAGE=$2
   local COLOR=$3
-  if $DEBUG; then
-    echo "$MESSAGE ($HOVER_MESSAGE)"
-  fi
+  debug-log "$MESSAGE ($HOVER_MESSAGE)"
   if $ENABLE_CHAT_MESSAGES; then
     execute-command "tellraw @a [\"\",{\"text\":\"[$PREFIX] \",\"color\":\"gray\",\"italic\":true},{\"text\":\"$MESSAGE\",\"color\":\"$COLOR\",\"italic\":true,\"hoverEvent\":{\"action\":\"show_text\",\"value\":{\"text\":\"\",\"extra\":[{\"text\":\"$HOVER_MESSAGE\"}]}}}]"
   fi
@@ -342,9 +345,7 @@ delete-thinning () {
 
     if $BLOCK_COMMAND; then
       # Oldest backup in this block satisfies the condition for placement in the next block
-      if $DEBUG; then
-        echo "$OLDEST_BACKUP_IN_BLOCK promoted to next block" 
-      fi
+      debug-log "$OLDEST_BACKUP_IN_BLOCK promoted to next block" 
     else
       # Oldest backup in this block does not satisfy the condition for placement in next block
       delete-backup "$OLDEST_BACKUP_IN_BLOCK"
