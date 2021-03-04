@@ -129,6 +129,14 @@ test-block-size-warning () {
   assertContains "$OUTPUT" "is smaller than TOTAL_BLOCK_SIZE"
 }
 
+test-nonzero-exit-warning () {
+  TIMESTAMP="$(date +%F_%H-%M-%S --date="2021-01-01")"
+  OUTPUT="$(./backup.sh -a _BLAH_ -i "$TEST_TMP/server/world" -o "$TEST_TMP/backups" -s "$SCREEN_TMP" -f "$TIMESTAMP" 2>&1)"
+  EXIT_CODE="$?"
+  assertNotEquals 0 "$EXIT_CODE"
+  assertContains "$OUTPUT" "Archive command exited with nonzero exit code"
+}
+
 test-screen-interface () {
   TIMESTAMP="$(date +%F_%H-%M-%S --date="2021-01-01")"
   ./backup.sh -i "$TEST_TMP/server/world" -o "$TEST_TMP/backups" -s "$SCREEN_TMP" -f "$TIMESTAMP"

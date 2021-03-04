@@ -212,8 +212,8 @@ if $MISSING_CONFIGURATION; then
   exit 1
 fi
 
-ARCHIVE_FILE_NAME=$TIMESTAMP.tar$COMPRESSION_FILE_EXTENSION
-ARCHIVE_PATH=$BACKUP_DIRECTORY/$ARCHIVE_FILE_NAME
+ARCHIVE_FILE_NAME="$TIMESTAMP.tar$COMPRESSION_FILE_EXTENSION"
+ARCHIVE_PATH="$BACKUP_DIRECTORY/$ARCHIVE_FILE_NAME"
 
 # Minecraft server screen interface functions
 message-players () {
@@ -374,6 +374,10 @@ case $COMPRESSION_ALGORITHM in
   *) tar -cf - -C "$SERVER_WORLD" . | $COMPRESSION_ALGORITHM -cv -"$COMPRESSION_LEVEL" - > "$ARCHIVE_PATH" 2>> /dev/null
     ;;
 esac
+ARCHIVE_EXIT_CODE="$?"
+if [ $ARCHIVE_EXIT_CODE -ne 0 ]; then
+  log-fatal "Archive command exited with nonzero exit code $ARCHIVE_EXIT_CODE"
+fi
 sync
 END_TIME=$(date +"%s")
 
@@ -401,10 +405,15 @@ BACKUP_DIRECTORY_SIZE=$(du -h --max-depth=0 "$BACKUP_DIRECTORY" | awk '{print $1
 TIME_DELTA=$((END_TIME - START_TIME))
 
 # Check that archive size is not null and at least 200 Bytes
-if [[ "$WORLD_SIZE_BYTES" -gt 0 && "$ARCHIVE_SIZE" != "" && "$ARCHIVE_SIZE_BYTES" -gt 200 ]]; then
+if [[ "$ARCHIVE_EXIT_CODE" -eq 0 && "$WORLD_SIZE_BYTES" -gt 0 && "$ARCHIVE_SIZE" != "" && "$ARCHIVE_SIZE_BYTES" -gt 200 ]]; then
   COMPRESSION_PERCENT=$((ARCHIVE_SIZE_BYTES * 100 / WORLD_SIZE_BYTES))
   message-players-success "Backup complete!" "$TIME_DELTA s, $ARCHIVE_SIZE/$BACKUP_DIRECTORY_SIZE, $COMPRESSION_PERCENT%"
   delete-old-backups
 else
   message-players-error "Backup was not saved!" "Please notify an administrator"
+  if [ "$ARCHIVE_EXIT_CODE" -ne 0 ]; then
+    exit "$ARCHIVE_EXIT_CODE"
+  else
+    exit 1
+  fi
 fi
