@@ -309,6 +309,19 @@ array-sum () {
   echo "$SUM"
 }
 
+# Given two exit codes, print a nonzero one if there is one
+exit-code () {
+  if [ $1 -ne 0 ]; then
+    echo "$1"
+  else
+    if [[ "$2" == "" ]]; then
+      echo 0
+    else
+      echo "$2"
+    fi
+  fi
+}
+
 # Thinning delete method
 delete-thinning () {
   # sub-hourly, hourly, daily, weekly is everything else
@@ -358,7 +371,7 @@ delete-thinning () {
   delete-sequentially
 }
 
-# Ensure directory exists
+# Ensure backup directory exists
 mkdir -p "$(dirname "$ARCHIVE_PATH")"
 
 # Disable world autosaving
@@ -374,7 +387,7 @@ case $COMPRESSION_ALGORITHM in
   *) tar -cf - -C "$SERVER_WORLD" . | $COMPRESSION_ALGORITHM -cv -"$COMPRESSION_LEVEL" - > "$ARCHIVE_PATH" 2>> /dev/null
     ;;
 esac
-ARCHIVE_EXIT_CODE="$?"
+ARCHIVE_EXIT_CODE="$(exit-code "${PIPESTATUS[0]}" "${PIPESTATUS[1]}")"
 if [ $ARCHIVE_EXIT_CODE -ne 0 ]; then
   log-fatal "Archive command exited with nonzero exit code $ARCHIVE_EXIT_CODE"
 fi
