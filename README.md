@@ -10,7 +10,6 @@ Supports servers running in [screen](https://en.wikipedia.org/wiki/GNU_Screen), 
 - Manage deletion of old backups
   - "thin" - keep last 24 hourly, last 30 daily, and use remaining space for weekly backups
   - "sequential" - delete oldest backup
-- Choose your own compression algorithm (tested with: `gzip`, `xz`, `zstd`)
 - Works on vanilla (no plugins required)
 - Print backup status to the Minecraft chat
 
@@ -66,11 +65,11 @@ tar -xzvf /path/to/backups/2019-04-09_02-15-01.tar.gz
 Then you can move your restored world (`restored-world` in this case) to your Minecraft server folder and rename it (usually called `world`) so the Minecraft server uses it.
 
 ## Why not use `tar` directly?
-If the Minecraft server is currently running, you need to disable world autosaving, or you will likely get an error like this:
+If you use `tar` while the server is running, you will likely get an error like this because Minecraft autosaves the world periodically:
 ```
 tar: /some/path/here/world/region/r.1.11.mca: file changed as we read it
 ```
-This script will take care of disabling and then re-enabling autosaving for you, and also alert players in the chat of successful backups or errors. This script also manages deleting old backups.
+To fix this problem, the backup script disables autosaving with the `save-off` Minecraft command before running `tar` and then re-enables autosaving after `tar` is done. 
 
 ## Help
 - Make sure the compression algorithm you specify is installed on your system. (zstd is not installed by default)

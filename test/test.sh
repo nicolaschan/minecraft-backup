@@ -5,6 +5,8 @@
 TEST_DIR="test"
 TEST_TMP="$TEST_DIR/tmp"
 SCREEN_TMP="tmp-screen"
+RCON_PORT="8088"
+RCON_PASSWORD="supersecret"
 setUp () {
   rm -rf "$TEST_TMP"
   mkdir -p "$TEST_TMP/server/world"
@@ -13,6 +15,8 @@ setUp () {
   echo "file2" > "$TEST_TMP/server/world/file2.txt"
   echo "file3" > "$TEST_TMP/server/world/file3.txt"
 
+  python test/mock_rcon.py "$RCON_PORT" "$RCON_PASSWORD" > "$TEST_TMP/rcon-output" &
+  echo "$!" > "$TEST_TMP/rcon-pid"
   screen -dmS "$SCREEN_TMP" bash
   screen -S "$SCREEN_TMP" -X stuff "cat > $TEST_TMP/screen-output\n"
   tmux new-session -d -s "$SCREEN_TMP"
@@ -21,6 +25,8 @@ setUp () {
 }
 
 tearDown () {
+  RCON_PID="$(cat "$TEST_TMP/rcon-pid")"
+  kill "$RCON_PID" >/dev/null 2>&1 || true
   screen -S "$SCREEN_TMP" -X quit >/dev/null 2>&1 || true
   tmux kill-session -t "$SCREEN_TMP" >/dev/null 2>&1 || true
 }
@@ -88,7 +94,7 @@ test-missing-options () {
   OUTPUT="$(./backup.sh 2>&1)"
   EXIT_CODE="$?"
   assertEquals 1 "$EXIT_CODE"
-  assertContains "$OUTPUT" "Minecraft screen name not specified"
+  assertContains "$OUTPUT" "Minecraft screen/tmux/rcon location not specified (use -s)"
   assertContains "$OUTPUT" "Server world not specified"
   assertContains "$OUTPUT" "Backup directory not specified"
 }
@@ -97,7 +103,7 @@ test-missing-options-suppress-warnings () {
   OUTPUT="$(./backup.sh -q 2>&1)"
   EXIT_CODE="$?"
   assertEquals 1 "$EXIT_CODE"
-  assertNotContains "$OUTPUT" "Minecraft screen name not specified"
+  assertNotContains "$OUTPUT" "Minecraft screen/tmux/rcon location not specified (use -s)"
 }
 
 test-empty-world-warning () {
@@ -127,6 +133,20 @@ test-tmux-interface () {
   EXPECTED_CONTENTS=$(echo -e "save-off\nsave-on\nsave-all") 
   SCREEN_CONTENTS="$(cat "$TEST_TMP/tmux-output")"
   assertEquals "$SCREEN_CONTENTS" "$EXPECTED_CONTENTS" 
+}
+
+test-rcon-interface () {
+  TIMESTAMP="$(date +%F_%H-%M-%S --date="2021-01-01")"
+  ./backup.sh -w rcon -i "$TEST_TMP/server/world" -o "$TEST_TMP/backups" -s "localhost:$RCON_PORT:$RCON_PASSWORD" -f "$TIMESTAMP"
+  EXPECTED_CONTENTS=$(echo -e "save-off\nsave-on\nsave-all") 
+  SCREEN_CONTENTS="$(head -n3 "$TEST_TMP/rcon-output")"
+  assertEquals "$SCREEN_CONTENTS" "$EXPECTED_CONTENTS" 
+}
+
+test-rcon-interface-wrong-password () {
+  TIMESTAMP="$(date +%F_%H-%M-%S --date="2021-01-01")"
+  OUTPUT="$(./backup.sh -w rcon -i "$TEST_TMP/server/world" -o "$TEST_TMP/backups" -s "localhost:$RCON_PORT:wrong$RCON_PASSWORD" -f "$TIMESTAMP" 2>&1)"
+  assertContains "$OUTPUT" "Wrong RCON password"
 }
 
 test-sequential-delete () {
