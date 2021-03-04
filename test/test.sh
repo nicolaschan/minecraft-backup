@@ -23,7 +23,7 @@ setUp () {
   echo "$!" > "$TEST_TMP/rcon-pid"
 
   while ! [[ (-f "$TEST_TMP/screen-output")  && (-f "$TEST_TMP/tmux-output") && (-f "$TEST_TMP/rcon-output") ]]; do
-    sleep 0.3
+    sleep 0.5
   done
 }
 
