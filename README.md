@@ -89,6 +89,9 @@ To fix this problem, the backup script disables autosaving with the `save-off` M
 - Do not put trailing `/` in the `SERVER_DIRECTORY` or `BACKUP_DIRECTORY`
 - If "thin" delete method is behaving weirdly, try emptying your backup directory or switch to "sequential"
 
+## Known Issues
+There is a Minecraft bug [MC-217729](https://bugs.mojang.com/projects/MC/issues/MC-217729) in recent Minecraft server versions that cause them to automatically save the world even after receiving the `save-off` command. Until this is fixed, there is a chance that the backup will fail because the world files are modified by Minecraft in the process of creating the backup. This script will try to detect and report this problem if it does occur.
+
 ## Disclaimer
 Backups are essential to the integrity of your Minecraft world. You should automate regular backups and **check that your backups work**. It is up to you to make sure that your backups work and that you have a reliable backup policy. 
 
