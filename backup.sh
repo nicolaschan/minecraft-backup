@@ -405,6 +405,7 @@ clean-up () {
     delete-old-backups
     exit 0
   else
+    rm "$ARCHIVE_PATH" # Delete failed backup so that we don't have corrupt backups taking up space
     message-players-error "Backup was not saved!" "Please notify an administrator"
     exit 1
   fi
