@@ -1,5 +1,5 @@
 # Minecraft Backup
-![GitHub Workflow Status](https://img.shields.io/github/workflow/status/nicolaschan/minecraft-backup/CI)
+[![CI](https://github.com/nicolaschan/minecraft-backup/actions/workflows/ci.yml/badge.svg)](https://github.com/nicolaschan/minecraft-backup/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/nicolaschan/minecraft-backup/branch/master/graph/badge.svg?token=LCbVC4TbYJ)](https://codecov.io/gh/nicolaschan/minecraft-backup)
 
 Backup script for Minecraft servers on Linux. 
