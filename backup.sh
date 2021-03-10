@@ -4,7 +4,7 @@
 # https://github.com/nicolaschan/minecraft-backup
 # MIT License
 #
-# For Minecraft servers running in a GNU screen.
+# For Minecraft servers running in a GNU screen, tmux, or RCON.
 # For most convenience, run automatically with cron.
 
 # Default Configuration 
@@ -405,6 +405,7 @@ clean-up () {
     delete-old-backups
     exit 0
   else
+    rm "$ARCHIVE_PATH" # Delete bad archive so we can't fill up with bad archives
     message-players-error "Backup was not saved!" "Please notify an administrator"
     exit 1
   fi
@@ -428,7 +429,18 @@ case $COMPRESSION_ALGORITHM in
   *) tar -cf - -C "$SERVER_WORLD" . | $COMPRESSION_ALGORITHM -cv -"$COMPRESSION_LEVEL" - > "$ARCHIVE_PATH" 2>> /dev/null
     ;;
 esac
-ARCHIVE_EXIT_CODE="$(exit-code "${PIPESTATUS[0]}" "${PIPESTATUS[1]}")"
+EXIT_CODES=("${PIPESTATUS[@]}")
+
+# tar exit codes: http://www.gnu.org/software/tar/manual/html_section/Synopsis.html
+# 0 = successful, 1 = some files differ, 2 = fatal
+if [ "${EXIT_CODES[0]}" == "1" ]; then
+  log-warning "Some files may differ in the backup archive (file changed as read)"
+  TAR_EXIT_CODE="0"
+else
+  TAR_EXIT_CODE="${EXIT_CODES[0]}"
+fi
+
+ARCHIVE_EXIT_CODE="$(exit-code "$TAR_EXIT_CODE" "${EXIT_CODES[1]}")"
 if [ "$ARCHIVE_EXIT_CODE" -ne 0 ]; then
   log-fatal "Archive command exited with nonzero exit code $ARCHIVE_EXIT_CODE"
 fi

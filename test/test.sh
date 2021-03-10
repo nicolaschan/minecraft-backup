@@ -152,6 +152,27 @@ test-nonzero-exit-warning () {
   EXIT_CODE="$?"
   assertNotEquals 0 "$EXIT_CODE"
   assertContains "$OUTPUT" "Archive command exited with nonzero exit code"
+  assertFalse "[ -f "$TEST_TMP/backups/$TIMESTAMP.tar.gz" ]"
+}
+
+test-file-changed-as-read-warning () {
+  TIMESTAMP="$(date +%F_%H-%M-%S --date="2021-01-01")"
+  dd if=/dev/urandom of="$TEST_TMP/server/world/random" &
+  DD_PID="$!"
+  OUTPUT="$(./backup.sh -i "$TEST_TMP/server/world" -o "$TEST_TMP/backups" -s "$SCREEN_TMP" -f "$TIMESTAMP" 2>&1)"
+  EXIT_CODE="$?"
+  kill "$DD_PID"
+  assertEquals 0 "$EXIT_CODE"
+  assertContains "$OUTPUT" "Some files may differ in the backup archive"
+
+  # Check that the backup actually resulted in a valid tar 
+  assertTrue "[ -f "$TEST_TMP/backups/$TIMESTAMP.tar.gz" ]"
+
+  mkdir -p "$TEST_TMP/restored"
+  tar --extract --file "$TEST_TMP/backups/$TIMESTAMP.tar.gz" --directory "$TEST_TMP/restored"
+  assert-equals-directory "$WORLD_DIR/file1.txt" "$TEST_TMP/restored/file1.txt"
+  assert-equals-directory "$WORLD_DIR/file2.txt" "$TEST_TMP/restored/file2.txt"
+  assert-equals-directory "$WORLD_DIR/file3.txt" "$TEST_TMP/restored/file3.txt"
 }
 
 test-screen-interface () {
