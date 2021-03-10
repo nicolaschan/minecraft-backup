@@ -32,6 +32,7 @@ tearDown () {
   kill "$RCON_PID" >/dev/null 2>&1 || true
   screen -S "$SCREEN_TMP" -X quit >/dev/null 2>&1 || true
   tmux kill-session -t "$SCREEN_TMP" >/dev/null 2>&1 || true
+  sleep 0.1
 }
 
 assert-equals-directory () {
