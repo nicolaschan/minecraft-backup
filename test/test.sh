@@ -147,13 +147,21 @@ test-block-size-warning () {
   assertContains "$OUTPUT" "is smaller than TOTAL_BLOCK_SIZE"
 }
 
+test-bad-input-world () {
+  TIMESTAMP="$(date +%F_%H-%M-%S --date="2021-01-01")"
+  OUTPUT="$(./backup.sh -m 10 -i "$TEST_TMP/server/notworld" -o "$TEST_TMP/backups" -s "$SCREEN_TMP" -f "$TIMESTAMP" 2>&1)"
+  EXIT_CODE="$?"
+  assertNotEquals 0 "$EXIT_CODE"
+  assertFalse '[ -f '"$TEST_TMP/backups/$TIMESTAMP.tar.gz"' ]'
+}
+
 test-nonzero-exit-warning () {
   TIMESTAMP="$(date +%F_%H-%M-%S --date="2021-01-01")"
   OUTPUT="$(./backup.sh -a _BLAH_ -i "$TEST_TMP/server/world" -o "$TEST_TMP/backups" -s "$SCREEN_TMP" -f "$TIMESTAMP" 2>&1)"
   EXIT_CODE="$?"
   assertNotEquals 0 "$EXIT_CODE"
   assertContains "$OUTPUT" "Archive command exited with nonzero exit code"
-  assertFalse "[ -f "$TEST_TMP/backups/$TIMESTAMP.tar.gz" ]"
+  assertFalse '[ -f '"$TEST_TMP/backups/$TIMESTAMP.tar.gz"' ]'
 }
 
 test-file-changed-as-read-warning () {
@@ -167,7 +175,7 @@ test-file-changed-as-read-warning () {
   assertContains "$OUTPUT" "Some files may differ in the backup archive"
 
   # Check that the backup actually resulted in a valid tar 
-  assertTrue "[ -f "$TEST_TMP/backups/$TIMESTAMP.tar.gz" ]"
+  assertTrue '[ -f '"$TEST_TMP/backups/$TIMESTAMP.tar.gz"' ]'
 
   mkdir -p "$TEST_TMP/restored"
   tar --extract --file "$TEST_TMP/backups/$TIMESTAMP.tar.gz" --directory "$TEST_TMP/restored"
