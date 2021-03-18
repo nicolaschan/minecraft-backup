@@ -16,10 +16,14 @@ setUp () {
   echo "file3" > "$TEST_TMP/server/world/file3.txt"
 
   screen -dmS "$SCREEN_TMP" bash
-  sleep 0.1
+  while ! screen -S "$SCREEN_TMP" -Q "select" . &>/dev/null; do
+    sleep 0.1
+  done
   screen -S "$SCREEN_TMP" -X stuff "cat > $TEST_TMP/screen-output\n"
   tmux new-session -d -s "$SCREEN_TMP"
-  sleep 0.1
+  while ! tmux has-session -t "$SCREEN_TMP" 2>/dev/null; do
+    sleep 0.1
+  done
   tmux send-keys -t "$SCREEN_TMP" "cat > $TEST_TMP/tmux-output" ENTER
   python test/mock_rcon.py "$RCON_PORT" "$RCON_PASSWORD" > "$TEST_TMP/rcon-output" &
   echo "$!" > "$TEST_TMP/rcon-pid"

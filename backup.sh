@@ -159,7 +159,7 @@ rcon-command () {
     RESPONSE=$(read-response "$IN_PIPE")
 
     RESPONSE_REQUEST_ID=$(response-request-id "$RESPONSE")
-    if [ "$RESPONSE_REQUEST_ID" -eq -1 ] || [ "$RESPONSE_REQUEST_ID" -eq 4294967295 ]; then
+    if [[ "$RESPONSE_REQUEST_ID" == "-1" ]] || [[ "$RESPONSE_REQUEST_ID" == "4294967295" ]]; then
       log-warning "RCON connection failed: Wrong RCON password" 1>&2
       return 1
     fi
