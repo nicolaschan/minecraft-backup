@@ -276,7 +276,7 @@ delete-backup () {
 
 # Sequential delete method
 delete-sequentially () {
-  local BACKUPS=("$BACKUP_DIRECTORY"/*)
+  local BACKUPS=("$BACKUP_DIRECTORY"/*) # List oldest first
   while [[ $MAX_BACKUPS -ge 0 && ${#BACKUPS[@]} -gt $MAX_BACKUPS ]]; do
     delete-backup "$(basename "${BACKUPS[0]}")"
     BACKUPS=("$BACKUP_DIRECTORY"/*)
@@ -342,18 +342,18 @@ delete-thinning () {
   fi
 
   local CURRENT_INDEX=0
-  local BACKUPS=("$BACKUP_DIRECTORY"/*) # List newest first
+  local BACKUPS=("$BACKUP_DIRECTORY"/*) # Oldest first
+  local NUM_BACKUPS="${#BACKUPS[@]}"
 
   for BLOCK_INDEX in "${!BLOCK_SIZES[@]}"; do
     local BLOCK_SIZE=${BLOCK_SIZES[BLOCK_INDEX]}
     local BLOCK_FUNCTION=${BLOCK_FUNCTIONS[BLOCK_INDEX]}
-    local OLDEST_BACKUP_IN_BLOCK_INDEX=$((BLOCK_SIZE + CURRENT_INDEX)) # Not an off-by-one error because a new backup was already saved 
+    local OLDEST_BACKUP_IN_BLOCK_INDEX=$((NUM_BACKUPS - 1 - (BLOCK_SIZE + CURRENT_INDEX))) # Not an off-by-one error because a new backup was already saved 
+    if [ "$OLDEST_BACKUP_IN_BLOCK_INDEX" -lt 0 ]; then
+      break;
+    fi
     local OLDEST_BACKUP_IN_BLOCK
     OLDEST_BACKUP_IN_BLOCK="$(basename "${BACKUPS[OLDEST_BACKUP_IN_BLOCK_INDEX]}")"
-
-    if [[ "$OLDEST_BACKUP_IN_BLOCK" == "" ]]; then
-      break
-    fi
 
     local OLDEST_BACKUP_TIMESTAMP
     OLDEST_BACKUP_TIMESTAMP=$(parse-file-timestamp "${OLDEST_BACKUP_IN_BLOCK:0:19}")
