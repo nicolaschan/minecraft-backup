@@ -45,3 +45,4 @@ jobs:
           echo ${{ secrets.CR_PAT }} | docker login ghcr.io -u $GITHUB_ACTOR --password-stdin
           docker build . --file Dockerfile --tag ghcr.io/nicolaschan/minecraft-backup:$GITHUB_SHA --tag ghcr.io/nicolaschan/minecraft-backup:latest
           docker push ghcr.io/nicolaschan/minecraft-backup:$GITHUB_SHA
+          docker push ghcr.io/nicolaschan/minecraft-backup:latest
