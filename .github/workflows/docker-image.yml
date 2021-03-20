@@ -1,0 +1,21 @@
+name: Docker Image CI
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Build the Docker image
+      run: |
+        echo ${{ secrets.CR_PAT }} | docker login ghcr.io -u $GITHUB_ACTOR --password-stdin
+        docker build . --file Dockerfile --tag ghcr.io/nicolaschan/minecraft-backup:$GITHUB_SHA
+        docker push ghcr.io/nicolaschan/minecraft-backup:$GITHUB_SHA
