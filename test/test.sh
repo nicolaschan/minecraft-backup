@@ -295,9 +295,10 @@ test-thinning-delete () {
 test-thinning-delete-long () {
   for i in $(seq 0 99); do
     TIMESTAMP="$(date +%F_%H-%M-%S --date="2021-01-01 +$i day")"
-    OUTPUT="$(./backup.sh -v -i "$TEST_TMP/server/world" -o "$TEST_TMP/backups" -s "$SCREEN_TMP" -f "$TIMESTAMP")"
+    OUTPUT="$(./backup.sh -v -m 73 -i "$TEST_TMP/server/world" -o "$TEST_TMP/backups" -s "$SCREEN_TMP" -f "$TIMESTAMP")"
   done
   UNEXPECTED_TIMESTAMPS=(
+    "2021-01-04_00-00-00"
     "2021-01-05_00-00-00"
     "2021-01-12_00-00-00"
     "2021-01-24_00-00-00"
@@ -305,10 +306,9 @@ test-thinning-delete-long () {
   for TIMESTAMP in "${UNEXPECTED_TIMESTAMPS[@]}"; do
     assertFalse '[ -f '"$TEST_TMP/backups/$TIMESTAMP.tar.gz"' ]'
   done
-  assertEquals 74 "$(find "$TEST_TMP/backups" -type f | wc -l)" 
+  assertEquals 73 "$(find "$TEST_TMP/backups" -type f | wc -l)" 
   EXPECTED_TIMESTAMPS=(
     # Weekly
-    "2021-01-04_00-00-00"
     "2021-01-11_00-00-00"
     "2021-01-25_00-00-00"
     "2021-01-25_00-00-00"
