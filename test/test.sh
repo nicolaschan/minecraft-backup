@@ -9,7 +9,7 @@ RCON_PORT="8088"
 RCON_PASSWORD="supersecret"
 export RESTIC_PASSWORD="restic-pass-secret"
 setUp () {
-  chmod -R 755 "$TEST_TMP"
+  chmod -R 755 "$TEST_TMP" || true
   rm -rf "$TEST_TMP"
   mkdir -p "$TEST_TMP/server/world"
   mkdir -p "$TEST_TMP/backups"
@@ -84,6 +84,7 @@ test-restic-incomplete-snapshot () {
   chmod 000 "$TEST_TMP/server/world/file1.txt"
   TIMESTAMP="$(date +%F_%H-%M-%S --date="2021-01-01")"
   OUTPUT="$(./backup.sh -i "$TEST_TMP/server/world" -r "$TEST_TMP/backups-restic" -s "$SCREEN_TMP" -f "$TIMESTAMP")"
+  assertEquals 1 "$(restic list snapshots -r "$TEST_TMP/backups-restic" | wc -l)"
   assertContains "$OUTPUT" "Incomplete snapshot taken"
 }
 

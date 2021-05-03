@@ -3,7 +3,7 @@
 [![codecov](https://codecov.io/gh/nicolaschan/minecraft-backup/branch/master/graph/badge.svg?token=LCbVC4TbYJ)](https://codecov.io/gh/nicolaschan/minecraft-backup)
 
 Backup script for Minecraft servers on Linux. 
-Supports servers running in [screen](https://en.wikipedia.org/wiki/GNU_Screen), [tmux](https://en.wikipedia.org/wiki/Tmux), or with [RCON](https://wiki.vg/RCON) enabled.
+Supports servers running in [screen](https://en.wikipedia.org/wiki/GNU_Screen), [tmux](https://en.wikipedia.org/wiki/Tmux), or with [RCON](https://wiki.vg/RCON) enabled. Supports `tar` file or [`restic`](https://restic.net/) backup backends.
 
 ## Features
 - Create backups of your world folder
@@ -32,6 +32,18 @@ If using RCON, you will also need to have the [`xxd`](https://linux.die.net/man/
 
 # If running on tmux session 0:
 ./backup.sh -c -i /home/user/server/world -o /mnt/storage/backups -s 0 -w tmux 
+
+# Using restic (and RCON)
+export RESTIC_PASSWORD="restic-pass-secret" # your password here
+./backup.sh -c -i /home/user/server/world -r /mnt/storage/backups-restic -s localhost:25575:secret -w rcon
+
+# Using Docker and RCON
+# You will have to set up networking so that this Docker image can access the RCON server
+# In this example, the RCON server hostname is `server-host`
+docker run \ 
+  -v /home/user/server/world:/mnt/server \
+  -v /mnt/storage/backups:/mnt/backups \
+  ghcr.io/nicolaschan/minecraft-backup -c -i /mnt/server -o /mnt/backups -s server-host:25575:secret -w rcon
 ```
 
 This will show chat messages (`-c`) and save a backup of `/home/user/server/world` into `/mnt/storage/backups` using the default thinning deletion policy for old backups.
@@ -50,6 +62,7 @@ Command line options:
 -o    Output directory
 -p    Prefix that shows in Minecraft chat (default: Backup)
 -q    Suppress warnings
+-r    Restic repo name (if using restic)
 -s    Screen name, tmux session name, or hostname:port:password for RCON
 -v    Verbose mode
 -w    Window manager: screen (default), tmux, RCON 
@@ -73,6 +86,9 @@ tar -xzvf /path/to/backups/2019-04-09_02-15-01.tar.gz
 ```
 
 Then you can move your restored world (`restored-world` in this case) to your Minecraft server folder and rename it (usually called `world`) so the Minecraft server uses it.
+
+### With `restic`
+Use [`restic restore`](https://restic.readthedocs.io/en/latest/050_restore.html) to restore from backup.
 
 ## Why not use `tar` directly?
 If you use `tar` while the server is running, you will likely get an error like this because Minecraft autosaves the world periodically:
