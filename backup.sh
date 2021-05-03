@@ -38,7 +38,7 @@ debug-log () {
   fi
 }
 
-while getopts 'a:cd:e:f:hi:l:m:o:p:qs:vw:' FLAG; do
+while getopts 'a:cd:e:f:hi:l:m:o:p:qr:s:vw:' FLAG; do
   case $FLAG in
     a) COMPRESSION_ALGORITHM=$OPTARG ;;
     c) ENABLE_CHAT_MESSAGES=true ;;
@@ -57,6 +57,7 @@ while getopts 'a:cd:e:f:hi:l:m:o:p:qs:vw:' FLAG; do
        echo "-l    Compression level (default: 3)"
        echo "-m    Maximum backups to keep, use -1 for unlimited (default: 128)"
        echo "-o    Output directory"
+       echo "-r    Restic repo name (if using restic)"
        echo "-p    Prefix that shows in Minecraft chat (default: Backup)"
        echo "-q    Suppress warnings"
        echo "-s    Screen name, tmux session name, or hostname:port:password for RCON"
@@ -68,6 +69,7 @@ while getopts 'a:cd:e:f:hi:l:m:o:p:qs:vw:' FLAG; do
     l) COMPRESSION_LEVEL=$OPTARG ;;
     m) MAX_BACKUPS=$OPTARG ;;
     o) BACKUP_DIRECTORY=$OPTARG ;;
+    r) RESTIC_REPO=$OPTARG ;;
     p) PREFIX=$OPTARG ;;
     q) SUPPRESS_WARNINGS=true ;;
     s) SCREEN_NAME=$OPTARG ;;
@@ -190,25 +192,41 @@ rcon-command () {
   exec 3>&-
 }
 
-if [[ $COMPRESSION_FILE_EXTENSION == "." ]]; then
+if ! "$DEBUG"; then
+  QUIET="-q"
+else
+  QUIET=""
+fi
+
+if [[ "$COMPRESSION_FILE_EXTENSION" == "." ]]; then
   COMPRESSION_FILE_EXTENSION=""
 fi
 
 # Check for missing encouraged arguments
 if ! $SUPPRESS_WARNINGS; then
-  if [[ $SCREEN_NAME == "" ]]; then
+  if [[ "$SCREEN_NAME" == "" ]]; then
     log-warning "Minecraft screen/tmux/rcon location not specified (use -s)"
   fi
 fi
 # Check for required arguments
 MISSING_CONFIGURATION=false
-if [[ $SERVER_WORLD == "" ]]; then
+if [[ "$SERVER_WORLD" == "" ]]; then
   log-fatal "Server world not specified (use -i)"
   MISSING_CONFIGURATION=true
 fi
-if [[ $BACKUP_DIRECTORY == "" ]]; then
-  log-fatal "Backup directory not specified (use -o)"
+if [[ "$BACKUP_DIRECTORY" == "" ]] && [[ "$RESTIC_REPO" == "" ]]; then
+  log-fatal "Backup location not specified (use -o or -r)"
   MISSING_CONFIGURATION=true
+fi
+if [[ "$RESTIC_REPO" != "" ]]; then
+  if [[ "$BACKUP_DIRECTORY" != "" ]]; then
+    log-fatal "Both output directory (-o) and restic repo (-r) specified but only one may be used at a time"
+    MISSING_CONFIGURATION=true
+  fi
+  if [[ $MAX_BACKUPS -ge 0 ]] && [[ $MAX_BACKUPS -lt 70 ]] && [[ $DELETE_METHOD == "thin" ]]; then
+    log-fatal "Thinning delete with restic requires at least 70 snapshots to be kept. If you need to keep fewer than 70, use sequential delete."
+    MISSING_CONFIGURATION=true
+  fi
 fi
 
 if $MISSING_CONFIGURATION; then
@@ -256,9 +274,6 @@ message-players-color () {
     execute-command "tellraw @a [\"\",{\"text\":\"[$PREFIX] \",\"color\":\"gray\",\"italic\":true},{\"text\":\"$MESSAGE\",\"color\":\"$COLOR\",\"italic\":true,\"hoverEvent\":{\"action\":\"show_text\",\"value\":{\"text\":\"\",\"extra\":[{\"text\":\"$HOVER_MESSAGE\"}]}}}]"
   fi
 }
-
-# Notify players of start
-message-players "Starting backup..." "$ARCHIVE_FILE_NAME"
 
 # Parse file timestamp to one readable by "date" 
 parse-file-timestamp () {
@@ -359,7 +374,7 @@ delete-thinning () {
     OLDEST_BACKUP_TIMESTAMP=$(parse-file-timestamp "${OLDEST_BACKUP_IN_BLOCK:0:19}")
     local BLOCK_COMMAND="$BLOCK_FUNCTION $OLDEST_BACKUP_TIMESTAMP"
 
-    if $BLOCK_COMMAND; then
+   if $BLOCK_COMMAND; then
       # Oldest backup in this block satisfies the condition for placement in the next block
       debug-log "$OLDEST_BACKUP_IN_BLOCK promoted to next block" 
     else
@@ -374,14 +389,41 @@ delete-thinning () {
   delete-sequentially
 }
 
+delete-restic-sequential () {
+  if [ "$MAX_BACKUPS" -ge 0 ]; then
+    restic forget -r "$RESTIC_REPO" --keep-last "$MAX_BACKUPS" "$QUIET"
+  fi
+}
+
+delete-restic-thinning () {
+  if [ "$MAX_BACKUPS" -ge 70 ]; then 
+    # MAX_BACKUPS >= 70
+    restic forget -r "$RESTIC_REPO" --keep-last 16 --keep-hourly 24 --keep-daily 30 --keep-weekly $((MAX_BACKUPS - 70)) "$QUIET"
+  else 
+    # We have a check that MAX_BACKUPS is not 70 > MAX_BACKUPS >= 0, so we can assume here it is negative
+    # Negative means don't delete old snapshots
+    restic forget -r "$RESTIC_REPO" --keep-last 16 --keep-hourly 24 --keep-daily 30 --keep-weekly 9999999 "$QUIET"
+  fi
+}
+
 # Delete old backups
 delete-old-backups () {
-  case $DELETE_METHOD in
-    "sequential") delete-sequentially
-      ;;
-    "thin") delete-thinning
-      ;;
-  esac
+  if [[ "$BACKUP_DIRECTORY" != "" ]]; then
+    case $DELETE_METHOD in
+      "sequential") delete-sequentially
+        ;;
+      "thin") delete-thinning
+        ;;
+    esac
+  fi
+  if [[ "$RESTIC_REPO" != "" ]]; then
+    case $DELETE_METHOD in
+      "sequential") delete-restic-sequential
+        ;;
+     "thin") delete-restic-thinning
+        ;;
+    esac
+  fi
 }
 
 clean-up () {
@@ -391,59 +433,97 @@ clean-up () {
   # Save the world
   execute-command "save-all"
 
-  # Notify players of completion
-  WORLD_SIZE_BYTES=$(du -b --max-depth=0 "$SERVER_WORLD" | awk '{print $1}')
-  ARCHIVE_SIZE_BYTES=$(du -b "$ARCHIVE_PATH" | awk '{print $1}')
-  ARCHIVE_SIZE=$(du -h "$ARCHIVE_PATH" | awk '{print $1}')
-  BACKUP_DIRECTORY_SIZE=$(du -h --max-depth=0 "$BACKUP_DIRECTORY" | awk '{print $1}')
   TIME_DELTA=$((END_TIME - START_TIME))
 
-  # Check that archive size is not null and at least 200 Bytes
-  if [[ "$ARCHIVE_EXIT_CODE" == "0" && "$WORLD_SIZE_BYTES" -gt 0 && "$ARCHIVE_SIZE" != "" && "$ARCHIVE_SIZE_BYTES" -gt 200 ]]; then
-    COMPRESSION_PERCENT=$((ARCHIVE_SIZE_BYTES * 100 / WORLD_SIZE_BYTES))
-    message-players-success "Backup complete!" "$TIME_DELTA s, $ARCHIVE_SIZE/$BACKUP_DIRECTORY_SIZE, $COMPRESSION_PERCENT%"
-    delete-old-backups
-    exit 0
-  else
-    rm "$ARCHIVE_PATH" # Delete bad archive so we can't fill up with bad archives
-    message-players-error "Backup was not saved!" "Please notify an administrator"
-    exit 1
+  if [[ "$BACKUP_DIRECTORY" != "" ]]; then
+    WORLD_SIZE_BYTES=$(du -b --max-depth=0 "$SERVER_WORLD" | awk '{print $1}')
+    ARCHIVE_SIZE_BYTES=$(du -b "$ARCHIVE_PATH" | awk '{print $1}')
+    ARCHIVE_SIZE=$(du -h "$ARCHIVE_PATH" | awk '{print $1}')
+    BACKUP_DIRECTORY_SIZE=$(du -h --max-depth=0 "$BACKUP_DIRECTORY" | awk '{print $1}')
+
+    # Check that archive size is not null and at least 200 Bytes
+    if [[ "$ARCHIVE_EXIT_CODE" == "0" && "$WORLD_SIZE_BYTES" -gt 0 && "$ARCHIVE_SIZE" != "" && "$ARCHIVE_SIZE_BYTES" -gt 200 ]]; then
+      # Notify players of completion
+      COMPRESSION_PERCENT=$((ARCHIVE_SIZE_BYTES * 100 / WORLD_SIZE_BYTES))
+      message-players-success "Backup complete!" "$TIME_DELTA s, $ARCHIVE_SIZE/$BACKUP_DIRECTORY_SIZE, $COMPRESSION_PERCENT%"
+      delete-old-backups
+      exit 0
+    else
+      rm "$ARCHIVE_PATH" # Delete bad archive so we can't fill up with bad archives
+      message-players-error "Backup was not saved!" "Please notify an administrator"
+      exit 1
+    fi
+  fi
+
+  if [[ "$RESTIC_REPO" != "" ]]; then
+    if [[ "$ARCHIVE_EXIT_CODE" == "0" ]]; then
+      message-players-success "Backup complete!" "$TIME_DELTA s"
+      delete-old-backups
+      exit 0
+    else
+      message-players-error "Backup was not saved!" "Please notify an administrator"
+      exit 1
+    fi
   fi
 }
 
-trap "clean-up" 2
+# Notify players of start
+message-players "Starting backup..." "$ARCHIVE_FILE_NAME"
 
-# Ensure backup directory exists
-mkdir -p "$(dirname "$ARCHIVE_PATH")"
+trap "clean-up" 2
 
 # Disable world autosaving
 execute-command "save-off"
 
 # Backup world
 START_TIME=$(date +"%s")
-case $COMPRESSION_ALGORITHM in
-  # No compression
-  "") tar -cf "$ARCHIVE_PATH" -C "$SERVER_WORLD" .
-    ;;
-  # With compression
-  *) tar -cf - -C "$SERVER_WORLD" . | $COMPRESSION_ALGORITHM -cv -"$COMPRESSION_LEVEL" - > "$ARCHIVE_PATH" 2>> /dev/null
-    ;;
-esac
-EXIT_CODES=("${PIPESTATUS[@]}")
 
-# tar exit codes: http://www.gnu.org/software/tar/manual/html_section/Synopsis.html
-# 0 = successful, 1 = some files differ, 2 = fatal
-if [ "${EXIT_CODES[0]}" == "1" ]; then
-  log-warning "Some files may differ in the backup archive (file changed as read)"
-  TAR_EXIT_CODE="0"
-else
-  TAR_EXIT_CODE="${EXIT_CODES[0]}"
+if [[ "$BACKUP_DIRECTORY" != "" ]]; then
+  # Ensure backup directory exists
+  mkdir -p "$(dirname "$ARCHIVE_PATH")"
+
+  case $COMPRESSION_ALGORITHM in
+    # No compression
+    "") tar -cf "$ARCHIVE_PATH" -C "$SERVER_WORLD" .
+      ;;
+    # With compression
+    *) tar -cf - -C "$SERVER_WORLD" . | $COMPRESSION_ALGORITHM -cv -"$COMPRESSION_LEVEL" - > "$ARCHIVE_PATH" 2>> /dev/null
+      ;;
+  esac
+  EXIT_CODES=("${PIPESTATUS[@]}")
+
+  # tar exit codes: http://www.gnu.org/software/tar/manual/html_section/Synopsis.html
+  # 0 = successful, 1 = some files differ, 2 = fatal
+  if [ "${EXIT_CODES[0]}" == "1" ]; then
+    log-warning "Some files may differ in the backup archive (file changed as read)"
+    TAR_EXIT_CODE="0"
+  else
+    TAR_EXIT_CODE="${EXIT_CODES[0]}"
+  fi
+
+  ARCHIVE_EXIT_CODE="$(exit-code "$TAR_EXIT_CODE" "${EXIT_CODES[1]}")"
+  if [ "$ARCHIVE_EXIT_CODE" -ne 0 ]; then
+    log-fatal "Archive command exited with nonzero exit code $ARCHIVE_EXIT_CODE"
+  fi
 fi
 
-ARCHIVE_EXIT_CODE="$(exit-code "$TAR_EXIT_CODE" "${EXIT_CODES[1]}")"
-if [ "$ARCHIVE_EXIT_CODE" -ne 0 ]; then
-  log-fatal "Archive command exited with nonzero exit code $ARCHIVE_EXIT_CODE"
+if [[ "$RESTIC_REPO" != "" ]]; then
+  RESTIC_TIMESTAMP="${TIMESTAMP:0:10} ${TIMESTAMP:11:2}:${TIMESTAMP:14:2}:${TIMESTAMP:17:2}"
+  restic backup -r "$RESTIC_REPO" "$SERVER_WORLD" --time "$RESTIC_TIMESTAMP" "$QUIET"
+  ARCHIVE_EXIT_CODE=$?
+  if [ "$ARCHIVE_EXIT_CODE" -eq 3 ]; then
+    log-warning "Incomplete snapshot taken (some files could not be read)"
+    ARCHIVE_EXIT_CODE="0"
+  else 
+    if [ "$ARCHIVE_EXIT_CODE" -ne 0 ]; then
+      # According to the restic docs, exit code is either 0, 1, or 3
+      # Exit code 1 means fatal
+      # See: https://restic.readthedocs.io/en/latest/040_backup.html
+      log-fatal "No restic snapshot created (exit code $ARCHIVE_EXIT_CODE)"
+    fi
+  fi
 fi
+
 sync
 END_TIME=$(date +"%s")
 

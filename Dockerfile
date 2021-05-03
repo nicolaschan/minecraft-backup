@@ -1,6 +1,6 @@
 FROM alpine
 
-RUN apk add bash coreutils xxd
+RUN apk add bash coreutils xxd restic
 
 WORKDIR /code
 COPY ./backup.sh .

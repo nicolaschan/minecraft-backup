@@ -7,13 +7,16 @@ TEST_TMP="$TEST_DIR/tmp"
 SCREEN_TMP="tmp-screen"
 RCON_PORT="8088"
 RCON_PASSWORD="supersecret"
+export RESTIC_PASSWORD="restic-pass-secret"
 setUp () {
+  chmod -R 755 "$TEST_TMP"
   rm -rf "$TEST_TMP"
   mkdir -p "$TEST_TMP/server/world"
   mkdir -p "$TEST_TMP/backups"
   echo "file1" > "$TEST_TMP/server/world/file1.txt"
   echo "file2" > "$TEST_TMP/server/world/file2.txt"
   echo "file3" > "$TEST_TMP/server/world/file3.txt"
+  restic init -r "$TEST_TMP/backups-restic" -q
 
   screen -dmS "$SCREEN_TMP" bash
   while ! screen -S "$SCREEN_TMP" -Q "select" . &>/dev/null; do
@@ -42,6 +45,9 @@ tearDown () {
 }
 
 assert-equals-directory () {
+  if ! [ -e "$1" ]; then
+    fail "File not found: $1"
+  fi
   if [ -d "$1" ]; then
     for FILE in "$1"/*; do
       assert-equals-directory "$FILE" "$2/${FILE##$1}"
@@ -65,7 +71,99 @@ check-backup () {
   check-backup-full-paths "$TEST_TMP/backups/$BACKUP_ARCHIVE" "$TEST_TMP/server/world"
 }
 
+check-latest-backup-restic () {
+  WORLD_DIR="$TEST_TMP/server/world"
+  restic restore latest -r "$TEST_TMP/backups-restic" --target "$TEST_TMP/restored" -q
+  assert-equals-directory "$WORLD_DIR" "$TEST_TMP/restored/$WORLD_DIR"
+  rm -rf "$TEST_TMP/restored"
+}
+
 # Tests
+
+test-restic-incomplete-snapshot () {
+  chmod 000 "$TEST_TMP/server/world/file1.txt"
+  TIMESTAMP="$(date +%F_%H-%M-%S --date="2021-01-01")"
+  OUTPUT="$(./backup.sh -i "$TEST_TMP/server/world" -r "$TEST_TMP/backups-restic" -s "$SCREEN_TMP" -f "$TIMESTAMP")"
+  assertContains "$OUTPUT" "Incomplete snapshot taken"
+}
+
+test-restic-no-snapshot () {
+  rm -rf "$TEST_TMP/server"
+  TIMESTAMP="$(date +%F_%H-%M-%S --date="2021-01-01")"
+  OUTPUT="$(./backup.sh -i "$TEST_TMP/server/world" -r "$TEST_TMP/backups-restic" -s "$SCREEN_TMP" -f "$TIMESTAMP")"
+  EXIT_CODE="$?"
+  assertNotEquals 0 "$EXIT_CODE"
+  assertContains "$OUTPUT" "No restic snapshot created"
+}
+
+test-restic-thinning-too-few () {
+  TIMESTAMP="$(date +%F_%H-%M-%S --date="2021-01-01")"
+  OUTPUT="$(./backup.sh -m 10 -i "$TEST_TMP/server/world" -r "$TEST_TMP/backups-restic" -s "$SCREEN_TMP" -f "$TIMESTAMP" 2>&1)"
+  EXIT_CODE="$?"
+  assertNotEquals 0 "$EXIT_CODE"
+  assertContains "$OUTPUT" "Thinning delete with restic requires at least 70 snapshots to be kept."
+}
+
+test-restic-thinning-delete-long () {
+  for i in $(seq 0 99); do
+    TIMESTAMP="$(date +%F_%H-%M-%S --date="2021-01-01 +$i day")"
+    ./backup.sh -m -1 -i "$TEST_TMP/server/world" -r "$TEST_TMP/backups-restic" -s "$SCREEN_TMP" -f "$TIMESTAMP"
+  done
+  EXPECTED_TIMESTAMPS=(
+    # Weekly
+    "2021-01-03 00:00:00"
+    "2021-01-10 00:00:00"
+    "2021-01-17 00:00:00"
+    "2021-01-24 00:00:00"
+    "2021-01-31 00:00:00"
+
+    # Daily (30)
+    "2021-03-13 00:00:00"
+    "2021-03-14 00:00:00"
+    "2021-03-15 00:00:00"
+    "2021-03-16 00:00:00"
+    "2021-03-17 00:00:00"
+    "2021-03-18 00:00:00"
+
+    # Hourly (24)
+    "2021-03-19 00:00:00"
+    "2021-03-20 00:00:00"
+    "2021-03-21 00:00:00"
+    "2021-03-22 00:00:00"
+    "2021-03-23 00:00:00"
+    "2021-03-24 00:00:00"
+    "2021-03-25 00:00:00"
+    "2021-03-26 00:00:00"
+
+    # Sub-hourly (16)
+    "2021-03-26 00:00:00"
+    "2021-03-27 00:00:00"
+    "2021-03-28 00:00:00"
+    "2021-03-29 00:00:00"
+    "2021-03-30 00:00:00"
+    "2021-03-31 00:00:00"
+    "2021-04-01 00:00:00"
+    "2021-04-02 00:00:00"
+    "2021-04-03 00:00:00"
+    "2021-04-04 00:00:00"
+    "2021-04-05 00:00:00"
+    "2021-04-06 00:00:00"
+    "2021-04-07 00:00:00"
+    "2021-04-08 00:00:00"
+    "2021-04-09 00:00:00"
+    "2021-04-10 00:00:00"
+  )
+  SNAPSHOTS="$(restic snapshots -r "$TEST_TMP/backups-restic")"
+  for TIMESTAMP in "${EXPECTED_TIMESTAMPS[@]}"; do
+    assertContains "$SNAPSHOTS" "$TIMESTAMP" 
+  done
+}
+
+test-restic-defaults () {
+  TIMESTAMP="$(date +%F_%H-%M-%S --date="2021-01-01")"
+  ./backup.sh -i "$TEST_TMP/server/world" -r "$TEST_TMP/backups-restic" -s "$SCREEN_TMP" -f "$TIMESTAMP"
+  check-latest-backup-restic
+}
 
 test-backup-defaults () {
   TIMESTAMP="$(date +%F_%H-%M-%S --date="2021-01-01")"
@@ -123,7 +221,14 @@ test-missing-options () {
   assertEquals 1 "$EXIT_CODE"
   assertContains "$OUTPUT" "Minecraft screen/tmux/rcon location not specified (use -s)"
   assertContains "$OUTPUT" "Server world not specified"
-  assertContains "$OUTPUT" "Backup directory not specified"
+  assertContains "$OUTPUT" "Backup location not specified"
+}
+
+test-restic-and-output-options () {
+  OUTPUT="$(./backup.sh -c -i "$TEST_TMP/server/world" -o "$TEST_TMP/backups" -s "$SCREEN_TMP" -f "$TIMESTAMP" -r "$TEST_TMP/backups-restic" 2>&1)"
+  EXIT_CODE="$?"
+  assertEquals 1 "$EXIT_CODE"
+  assertContains "$OUTPUT" "Both output directory (-o) and restic repo (-r) specified but only one may be used at a time"
 }
 
 test-missing-options-suppress-warnings () {
@@ -242,6 +347,24 @@ test-sequential-delete () {
   assertEquals 10 "$(find "$TEST_TMP/backups" -type f | wc -l)" 
 }
 
+test-restic-sequential-delete () {
+  for i in $(seq 0 20); do
+    TIMESTAMP="$(date +%F_%H-%M-%S --date="2021-01-01 +$i hour")"
+    ./backup.sh -d "sequential" -m 10 -i "$TEST_TMP/server/world" -r "$TEST_TMP/backups-restic" -s "$SCREEN_TMP" -f "$TIMESTAMP"
+  done
+  assertEquals 10 "$(restic list snapshots -r "$TEST_TMP/backups-restic" | wc -l)"
+  check-latest-backup-restic
+  SNAPSHOTS="$(restic snapshots -r "$TEST_TMP/backups-restic")"
+  for i in $(seq 11 20); do
+    TIMESTAMP="$(date "+%F %H:%M:%S" --date="2021-01-01 +$i hour")"
+    assertContains "$SNAPSHOTS" "$TIMESTAMP" 
+  done
+  for i in $(seq 0 10); do
+    TIMESTAMP="$(date "+%F %H:%M:%S" --date="2021-01-01 +$i hour")"
+    assertNotContains "$SNAPSHOTS" "$TIMESTAMP" 
+  done
+}
+
 test-thinning-delete () {
   for i in $(seq 0 99); do
     TIMESTAMP="$(date +%F_%H-%M-%S --date="2021-01-01 +$i hour")"
@@ -289,6 +412,60 @@ test-thinning-delete () {
   )
   for TIMESTAMP in "${EXPECTED_TIMESTAMPS[@]}"; do
     check-backup "$TIMESTAMP.tar.gz"
+  done
+}
+
+test-restic-thinning-delete () {
+  for i in $(seq 0 99); do
+    TIMESTAMP="$(date +%F_%H-%M-%S --date="2021-01-01 +$i hour")"
+    ./backup.sh -m 70 -i "$TEST_TMP/server/world" -r "$TEST_TMP/backups-restic" -s "$SCREEN_TMP" -f "$TIMESTAMP"
+  done
+  EXPECTED_TIMESTAMPS=(
+    # Weekly
+
+    # Daily (30)
+    "2021-01-01 23:00:00"
+    "2021-01-02 23:00:00"
+    "2021-01-03 23:00:00"
+
+    # Hourly (24)
+    "2021-01-04 04:00:00"
+    "2021-01-04 05:00:00"
+    "2021-01-04 06:00:00"
+    "2021-01-04 07:00:00"
+    "2021-01-04 08:00:00"
+    "2021-01-04 09:00:00"
+    "2021-01-04 10:00:00"
+    "2021-01-04 11:00:00"
+
+    # Sub-hourly (16)
+    "2021-01-04 12:00:00"
+    "2021-01-04 13:00:00"
+    "2021-01-04 14:00:00"
+    "2021-01-04 15:00:00"
+    "2021-01-04 16:00:00"
+    "2021-01-04 17:00:00"
+    "2021-01-04 18:00:00"
+    "2021-01-04 19:00:00"
+    "2021-01-04 20:00:00"
+    "2021-01-04 21:00:00"
+    "2021-01-04 22:00:00"
+    "2021-01-04 23:00:00"
+    "2021-01-05 00:00:00"
+    "2021-01-05 01:00:00"
+    "2021-01-05 02:00:00"
+    "2021-01-05 03:00:00"
+  )
+  SNAPSHOTS="$(restic snapshots -r "$TEST_TMP/backups-restic")"
+  for TIMESTAMP in "${EXPECTED_TIMESTAMPS[@]}"; do
+    assertContains "$SNAPSHOTS" "$TIMESTAMP" 
+  done
+  UNEXPECTED_TIMESTAMPS=(
+    "2021-01-01 00:00:00"
+    "2021-01-02 22:00:00"
+  )
+  for TIMESTAMP in "${UNEXPECTED_TIMESTAMPS[@]}"; do
+    assertNotContains "$SNAPSHOTS" "$TIMESTAMP" 
   done
 }
 
