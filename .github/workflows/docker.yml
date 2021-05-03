@@ -1,10 +1,12 @@
 # This is a basic workflow to help you get started with Actions
 
-name: CI
+name: Docker
 
 # Controls when the action will run. 
 on:
   push:
+    branches:
+      - master
   pull_request:
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
@@ -39,3 +41,10 @@ jobs:
 
       - name: shellcheck
         run: shellcheck backup.sh
+
+      - name: Build the Docker image
+        run: |
+          echo ${{ secrets.CR_PAT }} | docker login ghcr.io -u $GITHUB_ACTOR --password-stdin
+          docker build . --file Dockerfile --tag ghcr.io/nicolaschan/minecraft-backup:$GITHUB_SHA --tag ghcr.io/nicolaschan/minecraft-backup:latest
+          docker push ghcr.io/nicolaschan/minecraft-backup:$GITHUB_SHA
+          docker push ghcr.io/nicolaschan/minecraft-backup:latest
