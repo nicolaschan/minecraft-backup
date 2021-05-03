@@ -9,7 +9,7 @@ RCON_PORT="8088"
 RCON_PASSWORD="supersecret"
 export RESTIC_PASSWORD="restic-pass-secret"
 setUp () {
-  chmod -R 755 "$TEST_TMP"
+  chmod -R 755 "$TEST_TMP" || true
   rm -rf "$TEST_TMP"
   mkdir -p "$TEST_TMP/server/world"
   mkdir -p "$TEST_TMP/backups"
