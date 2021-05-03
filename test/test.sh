@@ -85,7 +85,7 @@ test-restic-incomplete-snapshot () {
   TIMESTAMP="$(date +%F_%H-%M-%S --date="2021-01-01")"
   OUTPUT="$(./backup.sh -i "$TEST_TMP/server/world" -r "$TEST_TMP/backups-restic" -s "$SCREEN_TMP" -f "$TIMESTAMP")"
   assertEquals 1 "$(restic list snapshots -r "$TEST_TMP/backups-restic" | wc -l)"
-  # assertContains "$OUTPUT" "Incomplete snapshot taken"
+  assertContains "$OUTPUT" "Incomplete snapshot taken"
 }
 
 test-restic-no-snapshot () {
