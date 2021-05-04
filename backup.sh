@@ -538,11 +538,11 @@ do-backup () {
 }
 
 if [[ "$LOCK_FILE" != "" ]]; then
-  TIMEOUT_OPTION=""
+  TIMEOUT_OPTION=()
   if [[ "$LOCK_FILE_TIMEOUT" != "" ]]; then
-    TIMEOUT_OPTION="-w $LOCK_FILE_TIMEOUT"
+    TIMEOUT_OPTION=("-w" "$LOCK_FILE_TIMEOUT")
   fi
-  (if ! flock $TIMEOUT_OPTION --no-fork 200; then
+  (if ! flock "${TIMEOUT_OPTION[@]}" --no-fork 200; then
       log-fatal "Could not acquire lock on lock file: $LOCK_FILE"
       exit 1
     fi
