@@ -64,8 +64,10 @@ Command line options:
 -q    Suppress warnings
 -r    Restic repo name (if using restic)
 -s    Screen name, tmux session name, or hostname:port:password for RCON
+-t    Enable lock file (lock file not used by default)
+-u    Lock file timeout seconds (empty = unlimited)
 -v    Verbose mode
--w    Window manager: screen (default), tmux, RCON 
+-w    Window manager: screen (default), tmux, RCON
 ```
 
 ### Automate backups with cron

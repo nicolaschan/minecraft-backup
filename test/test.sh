@@ -80,6 +80,23 @@ check-latest-backup-restic () {
 
 # Tests
 
+test-lock-defaults () {
+  TIMESTAMP="$(date +%F_%H-%M-%S --date="2021-01-01")"
+  ./backup.sh -t "$TEST_TMP/lockfile" -i "$TEST_TMP/server/world" -o "$TEST_TMP/backups" -s "$SCREEN_TMP" -f "$TIMESTAMP"
+  check-backup "$TIMESTAMP.tar.gz"
+  TIMESTAMP="$(date +%F_%H-%M-%S --date="2021-01-01 +1 hour")"
+  ./backup.sh -t "$TEST_TMP/lockfile" -i "$TEST_TMP/server/world" -o "$TEST_TMP/backups" -s "$SCREEN_TMP" -f "$TIMESTAMP"
+  check-backup "$TIMESTAMP.tar.gz"
+}
+
+test-lock-timeout () {
+  TIMESTAMP="$(date +%F_%H-%M-%S --date="2021-01-01")"
+  flock "$TEST_TMP/lockfile" sleep 10 &
+  OUTPUT=$(./backup.sh -t "$TEST_TMP/lockfile" -u 0 -i "$TEST_TMP/server/world" -o "$TEST_TMP/backups" -s "$SCREEN_TMP" -f "$TIMESTAMP")
+  assertNotEquals 0 "$?"
+  assertContains "$OUTPUT" "Could not acquire lock on lock file: $TEST_TMP/lockfile"
+}
+
 test-restic-incomplete-snapshot () {
   chmod 000 "$TEST_TMP/server/world/file1.txt"
   TIMESTAMP="$(date +%F_%H-%M-%S --date="2021-01-01")"

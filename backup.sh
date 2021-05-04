@@ -20,6 +20,8 @@ ENABLE_CHAT_MESSAGES=false # Tell players in Minecraft chat about backup status
 PREFIX="Backup" # Shows in the chat message
 DEBUG=false # Enable debug messages
 SUPPRESS_WARNINGS=false # Suppress warnings
+LOCK_FILE="" # Optional lock file to acquire to ensure two backups don't run at once
+LOCK_FILE_TIMEOUT="" # Optional lock file wait timeout (in seconds)
 WINDOW_MANAGER="screen" # Choices: screen, tmux, RCON
 
 # Other Variables (do not modify)
@@ -38,7 +40,7 @@ debug-log () {
   fi
 }
 
-while getopts 'a:cd:e:f:hi:l:m:o:p:qr:s:vw:' FLAG; do
+while getopts 'a:cd:e:f:hi:l:m:o:p:qr:s:t:u:vw:' FLAG; do
   case $FLAG in
     a) COMPRESSION_ALGORITHM=$OPTARG ;;
     c) ENABLE_CHAT_MESSAGES=true ;;
@@ -61,6 +63,8 @@ while getopts 'a:cd:e:f:hi:l:m:o:p:qr:s:vw:' FLAG; do
        echo "-q    Suppress warnings"
        echo "-r    Restic repo name (if using restic)"
        echo "-s    Screen name, tmux session name, or hostname:port:password for RCON"
+       echo "-t    Enable lock file (lock file not used by default)"
+       echo "-u    Lock file timeout seconds (empty = unlimited)"
        echo "-v    Verbose mode"
        echo "-w    Window manager: screen (default), tmux, RCON"
        exit 0
@@ -69,10 +73,12 @@ while getopts 'a:cd:e:f:hi:l:m:o:p:qr:s:vw:' FLAG; do
     l) COMPRESSION_LEVEL=$OPTARG ;;
     m) MAX_BACKUPS=$OPTARG ;;
     o) BACKUP_DIRECTORY=$OPTARG ;;
-    r) RESTIC_REPO=$OPTARG ;;
     p) PREFIX=$OPTARG ;;
     q) SUPPRESS_WARNINGS=true ;;
+    r) RESTIC_REPO=$OPTARG ;;
     s) SCREEN_NAME=$OPTARG ;;
+    t) LOCK_FILE=$OPTARG ;;
+    u) LOCK_FILE_TIMEOUT=$OPTARG ;;
     v) DEBUG=true ;;
     w) WINDOW_MANAGER=$OPTARG ;;
     *) log-fatal "Invalid option -$FLAG"; exit 1 ;;
@@ -467,64 +473,80 @@ clean-up () {
   fi
 }
 
-# Notify players of start
-message-players "Starting backup..." "$ARCHIVE_FILE_NAME"
-
 trap "clean-up" 2
 
-# Disable world autosaving
-execute-command "save-off"
+do-backup () {
+  # Notify players of start
+  message-players "Starting backup..." "$ARCHIVE_FILE_NAME"
 
-# Backup world
-START_TIME=$(date +"%s")
+  # Disable world autosaving
+  execute-command "save-off"
 
-if [[ "$BACKUP_DIRECTORY" != "" ]]; then
-  # Ensure backup directory exists
-  mkdir -p "$(dirname "$ARCHIVE_PATH")"
+  # Backup world
+  START_TIME=$(date +"%s")
 
-  case $COMPRESSION_ALGORITHM in
-    # No compression
-    "") tar -cf "$ARCHIVE_PATH" -C "$SERVER_WORLD" .
-      ;;
-    # With compression
-    *) tar -cf - -C "$SERVER_WORLD" . | $COMPRESSION_ALGORITHM -cv -"$COMPRESSION_LEVEL" - > "$ARCHIVE_PATH" 2>> /dev/null
-      ;;
-  esac
-  EXIT_CODES=("${PIPESTATUS[@]}")
+  if [[ "$BACKUP_DIRECTORY" != "" ]]; then
+    # Ensure backup directory exists
+    mkdir -p "$(dirname "$ARCHIVE_PATH")"
 
-  # tar exit codes: http://www.gnu.org/software/tar/manual/html_section/Synopsis.html
-  # 0 = successful, 1 = some files differ, 2 = fatal
-  if [ "${EXIT_CODES[0]}" == "1" ]; then
-    log-warning "Some files may differ in the backup archive (file changed as read)"
-    TAR_EXIT_CODE="0"
-  else
-    TAR_EXIT_CODE="${EXIT_CODES[0]}"
-  fi
+    case $COMPRESSION_ALGORITHM in
+      # No compression
+      "") tar -cf "$ARCHIVE_PATH" -C "$SERVER_WORLD" .
+        ;;
+      # With compression
+      *) tar -cf - -C "$SERVER_WORLD" . | $COMPRESSION_ALGORITHM -cv -"$COMPRESSION_LEVEL" - > "$ARCHIVE_PATH" 2>> /dev/null
+        ;;
+    esac
+    EXIT_CODES=("${PIPESTATUS[@]}")
 
-  ARCHIVE_EXIT_CODE="$(exit-code "$TAR_EXIT_CODE" "${EXIT_CODES[1]}")"
-  if [ "$ARCHIVE_EXIT_CODE" -ne 0 ]; then
-    log-fatal "Archive command exited with nonzero exit code $ARCHIVE_EXIT_CODE"
-  fi
-fi
+    # tar exit codes: http://www.gnu.org/software/tar/manual/html_section/Synopsis.html
+    # 0 = successful, 1 = some files differ, 2 = fatal
+    if [ "${EXIT_CODES[0]}" == "1" ]; then
+      log-warning "Some files may differ in the backup archive (file changed as read)"
+      TAR_EXIT_CODE="0"
+    else
+      TAR_EXIT_CODE="${EXIT_CODES[0]}"
+    fi
 
-if [[ "$RESTIC_REPO" != "" ]]; then
-  RESTIC_TIMESTAMP="${TIMESTAMP:0:10} ${TIMESTAMP:11:2}:${TIMESTAMP:14:2}:${TIMESTAMP:17:2}"
-  restic backup -r "$RESTIC_REPO" "$SERVER_WORLD" --time "$RESTIC_TIMESTAMP" "$QUIET"
-  ARCHIVE_EXIT_CODE=$?
-  if [ "$ARCHIVE_EXIT_CODE" -eq 3 ]; then
-    log-warning "Incomplete snapshot taken (some files could not be read)"
-    ARCHIVE_EXIT_CODE="0"
-  else 
+    ARCHIVE_EXIT_CODE="$(exit-code "$TAR_EXIT_CODE" "${EXIT_CODES[1]}")"
     if [ "$ARCHIVE_EXIT_CODE" -ne 0 ]; then
-      # According to the restic docs, exit code is either 0, 1, or 3
-      # Exit code 1 means fatal
-      # See: https://restic.readthedocs.io/en/latest/040_backup.html
-      log-fatal "No restic snapshot created (exit code $ARCHIVE_EXIT_CODE)"
+      log-fatal "Archive command exited with nonzero exit code $ARCHIVE_EXIT_CODE"
     fi
   fi
+
+  if [[ "$RESTIC_REPO" != "" ]]; then
+    RESTIC_TIMESTAMP="${TIMESTAMP:0:10} ${TIMESTAMP:11:2}:${TIMESTAMP:14:2}:${TIMESTAMP:17:2}"
+    restic backup -r "$RESTIC_REPO" "$SERVER_WORLD" --time "$RESTIC_TIMESTAMP" "$QUIET"
+    ARCHIVE_EXIT_CODE=$?
+    if [ "$ARCHIVE_EXIT_CODE" -eq 3 ]; then
+      log-warning "Incomplete snapshot taken (some files could not be read)"
+      ARCHIVE_EXIT_CODE="0"
+    else 
+      if [ "$ARCHIVE_EXIT_CODE" -ne 0 ]; then
+        # According to the restic docs, exit code is either 0, 1, or 3
+        # Exit code 1 means fatal
+        # See: https://restic.readthedocs.io/en/latest/040_backup.html
+        log-fatal "No restic snapshot created (exit code $ARCHIVE_EXIT_CODE)"
+      fi
+    fi
+  fi
+
+  sync
+  END_TIME=$(date +"%s")
+
+  clean-up
+}
+
+if [[ "$LOCK_FILE" != "" ]]; then
+  TIMEOUT_OPTION=""
+  if [[ "$LOCK_FILE_TIMEOUT" != "" ]]; then
+    TIMEOUT_OPTION="-w $LOCK_FILE_TIMEOUT"
+  fi
+  (if ! flock $TIMEOUT_OPTION --no-fork 200; then
+      log-fatal "Could not acquire lock on lock file: $LOCK_FILE"
+      exit 1
+    fi
+  do-backup) 200>"$LOCK_FILE"
+else
+  do-backup
 fi
-
-sync
-END_TIME=$(date +"%s")
-
-clean-up
