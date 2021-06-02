@@ -41,7 +41,7 @@ debug-log () {
   fi
 }
 
-while getopts 'a:cd:e:f:hi:l:m:o:p:qr:s:t:u:vw:' FLAG; do
+while getopts 'a:cd:e:f:hi:l:m:o:p:qr:s:t:u:vw:x:' FLAG; do
   case $FLAG in
     a) COMPRESSION_ALGORITHM=$OPTARG ;;
     c) ENABLE_CHAT_MESSAGES=true ;;
