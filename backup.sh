@@ -482,13 +482,14 @@ do-backup () {
   # set bukkit world paths if this is a bukkit server
   if "$BUKKIT"; then
     WORLD_PARENT_DIR=$(dirname "$SERVER_WORLD")
-    SERVER_WORLD=$(realpath "$SERVER_WORLD")
+    WORLDS_NAME=$(realpath "$SERVER_WORLD")
     # overwrite SERVER_WORLD so that restic gets all 3 dirs
-    SERVER_WORLD="$SERVER_WORLD/"\ "$SERVER_WORLD"_nether/\ "$SERVER_WORLD"_the_end/
+    WORLDS_NAME="$WORLDS_NAME/"\ "$WORLDS_NAME"_nether/\ "$WORLDS_NAME"_the_end/
     TAR_ARGS=$(basename -a "$SERVER_WORLD")
   else
     # no bukkit--retain previous functionality
     WORLD_PARENT_DIR="$SERVER_WORLD"
+    WORLDS_NAME="$SERVER_WORLD"
     TAR_ARGS="."
   fi
   # Notify players of start
@@ -531,7 +532,7 @@ do-backup () {
 
   if [[ "$RESTIC_REPO" != "" ]]; then
     RESTIC_TIMESTAMP="${TIMESTAMP:0:10} ${TIMESTAMP:11:2}:${TIMESTAMP:14:2}:${TIMESTAMP:17:2}"
-    restic backup -r "$RESTIC_REPO" $SERVER_WORLD --time "$RESTIC_TIMESTAMP" "$QUIET"
+    restic backup -r "$RESTIC_REPO" $WORLDS_NAME --time "$RESTIC_TIMESTAMP" "$QUIET"
     ARCHIVE_EXIT_CODE=$?
     if [ "$ARCHIVE_EXIT_CODE" -eq 3 ]; then
       log-warning "Incomplete snapshot taken (some files could not be read)"
