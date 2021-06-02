@@ -41,7 +41,7 @@ debug-log () {
   fi
 }
 
-while getopts 'a:cd:e:f:hi:l:m:o:p:qr:s:t:u:vw:x:' FLAG; do
+while getopts 'a:cd:e:f:hi:l:m:o:p:qr:s:t:u:vw:x' FLAG; do
   case $FLAG in
     a) COMPRESSION_ALGORITHM=$OPTARG ;;
     c) ENABLE_CHAT_MESSAGES=true ;;
@@ -482,9 +482,9 @@ do-backup () {
   # set bukkit world paths if this is a bukkit server
   if "$BUKKIT"; then
     WORLD_PARENT_DIR=$(dirname "$SERVER_WORLD")
-
+    SERVER_WORLD=$(realpath "$SERVER_WORLD")
     # overwrite SERVER_WORLD so that restic gets all 3 dirs
-    SERVER_WORLD="$SERVER_WORLD"\ "$SERVER_WORLD"_nether\ "$SERVER_WORLD"_the_end
+    SERVER_WORLD="$SERVER_WORLD/"\ "$SERVER_WORLD"_nether/\ "$SERVER_WORLD"_the_end/
     TAR_ARGS=$(basename -a "$SERVER_WORLD")
   else
     # no bukkit--retain previous functionality
@@ -506,10 +506,10 @@ do-backup () {
 
     case $COMPRESSION_ALGORITHM in
       # No compression
-      "") tar -cf "$ARCHIVE_PATH" -C "$WORLD_PARENT_DIR" "$TAR_ARGS"
+      "") tar -cf "$ARCHIVE_PATH" -C "$WORLD_PARENT_DIR" $TAR_ARGS
         ;;
       # With compression
-      *) tar -cf - -C "$WORLD_PARENT_DIR" "$TAR_ARGS" | $COMPRESSION_ALGORITHM -cv -"$COMPRESSION_LEVEL" - > "$ARCHIVE_PATH" 2>> /dev/null
+      *) tar -cf - -C "$WORLD_PARENT_DIR" $TAR_ARGS | $COMPRESSION_ALGORITHM -cv -"$COMPRESSION_LEVEL" - > "$ARCHIVE_PATH" 2>> /dev/null
         ;;
     esac
     EXIT_CODES=("${PIPESTATUS[@]}")
@@ -531,7 +531,7 @@ do-backup () {
 
   if [[ "$RESTIC_REPO" != "" ]]; then
     RESTIC_TIMESTAMP="${TIMESTAMP:0:10} ${TIMESTAMP:11:2}:${TIMESTAMP:14:2}:${TIMESTAMP:17:2}"
-    restic backup -r "$RESTIC_REPO" "$SERVER_WORLD" --time "$RESTIC_TIMESTAMP" "$QUIET"
+    restic backup -r "$RESTIC_REPO" $SERVER_WORLD --time "$RESTIC_TIMESTAMP" "$QUIET"
     ARCHIVE_EXIT_CODE=$?
     if [ "$ARCHIVE_EXIT_CODE" -eq 3 ]; then
       log-warning "Incomplete snapshot taken (some files could not be read)"
