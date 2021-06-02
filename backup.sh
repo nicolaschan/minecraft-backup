@@ -485,7 +485,7 @@ do-backup () {
     WORLDS_NAME=$(realpath "$SERVER_WORLD")
     # overwrite SERVER_WORLD so that restic gets all 3 dirs
     WORLDS_NAME="$WORLDS_NAME/"\ "$WORLDS_NAME"_nether/\ "$WORLDS_NAME"_the_end/
-    TAR_ARGS=$(basename -a "$SERVER_WORLD")
+    TAR_ARGS=$(basename -a "$WORLDS_NAME")
   else
     # no bukkit--retain previous functionality
     WORLD_PARENT_DIR="$SERVER_WORLD"
