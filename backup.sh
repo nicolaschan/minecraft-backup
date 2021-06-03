@@ -55,7 +55,7 @@ while getopts 'a:cd:e:f:hi:l:m:o:p:qr:s:t:u:vw:x' FLAG; do
        echo "-e    Compression file extension, exclude leading \".\" (default: gz)"
        echo "-f    Output file name (default is the timestamp)"
        echo "-h    Shows this help text"
-       echo "-i    Input directory (path to world folder)"
+       echo "-i    Input directory (path to world folder, use -i once for each world)"
        echo "-l    Compression level (default: 3)"
        echo "-m    Maximum backups to keep, use -1 for unlimited (default: 128)"
        echo "-o    Output directory"
