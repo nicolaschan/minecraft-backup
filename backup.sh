@@ -9,7 +9,7 @@
 
 # Default Configuration 
 SCREEN_NAME="" # Name of the GNU Screen, tmux session, or hostname:port:password for RCON
-SERVER_WORLD="" # Server world directory
+SERVER_WORLDS=() # Server world directory
 BACKUP_DIRECTORY="" # Directory to save backups in
 MAX_BACKUPS=128 # -1 indicates unlimited
 DELETE_METHOD="thin" # Choices: thin, sequential, none; sequential: delete oldest; thin: keep last 24 hourly, last 30 daily, and monthly (use with 1 hr cron interval)
@@ -23,7 +23,6 @@ SUPPRESS_WARNINGS=false # Suppress warnings
 LOCK_FILE="" # Optional lock file to acquire to ensure two backups don't run at once
 LOCK_FILE_TIMEOUT="" # Optional lock file wait timeout (in seconds)
 WINDOW_MANAGER="screen" # Choices: screen, tmux, RCON
-BUKKIT=false
 
 # Other Variables (do not modify)
 DATE_FORMAT="%F_%H-%M-%S"
@@ -71,7 +70,7 @@ while getopts 'a:cd:e:f:hi:l:m:o:p:qr:s:t:u:vw:x' FLAG; do
        echo "-x    Bukkit-style server backup mode (world files are split by dimension)"
        exit 0
        ;;
-    i) SERVER_WORLD=$OPTARG ;;
+    i) SERVER_WORLDS+=("$OPTARG") ;;
     l) COMPRESSION_LEVEL=$OPTARG ;;
     m) MAX_BACKUPS=$OPTARG ;;
     o) BACKUP_DIRECTORY=$OPTARG ;;
@@ -83,7 +82,6 @@ while getopts 'a:cd:e:f:hi:l:m:o:p:qr:s:t:u:vw:x' FLAG; do
     u) LOCK_FILE_TIMEOUT=$OPTARG ;;
     v) DEBUG=true ;;
     w) WINDOW_MANAGER=$OPTARG ;;
-    x) BUKKIT=true ;;
     *) log-fatal "Invalid option -$FLAG"; exit 1 ;;
   esac
 done
@@ -219,7 +217,7 @@ if ! $SUPPRESS_WARNINGS; then
 fi
 # Check for required arguments
 MISSING_CONFIGURATION=false
-if [[ "$SERVER_WORLD" == "" ]]; then
+if [[ "${#SERVER_WORLDS[@]}" == "0" ]]; then
   log-fatal "Server world not specified (use -i)"
   MISSING_CONFIGURATION=true
 fi
@@ -445,7 +443,7 @@ clean-up () {
   TIME_DELTA=$((END_TIME - START_TIME))
 
   if [[ "$BACKUP_DIRECTORY" != "" ]]; then
-    WORLD_SIZE_BYTES=$(du -b --max-depth=0 "$SERVER_WORLD" | awk '{print $1}')
+    WORLD_SIZE_BYTES=$(du --bytes --total --max-depth=0 "${SERVER_WORLDS[@]}" | tail -n 1 | awk '{print $1}')
     ARCHIVE_SIZE_BYTES=$(du -b "$ARCHIVE_PATH" | awk '{print $1}')
     ARCHIVE_SIZE=$(du -h "$ARCHIVE_PATH" | awk '{print $1}')
     BACKUP_DIRECTORY_SIZE=$(du -h --max-depth=0 "$BACKUP_DIRECTORY" | awk '{print $1}')
@@ -479,19 +477,6 @@ clean-up () {
 trap "clean-up" 2
 
 do-backup () {
-  # set bukkit world paths if this is a bukkit server
-  if "$BUKKIT"; then
-    WORLD_PARENT_DIR=$(dirname "$SERVER_WORLD")
-    WORLDS_NAME=$(realpath "$SERVER_WORLD")
-    # overwrite SERVER_WORLD so that restic gets all 3 dirs
-    WORLDS_NAME="$WORLDS_NAME/"\ "$WORLDS_NAME"_nether/\ "$WORLDS_NAME"_the_end/
-    TAR_ARGS=$(basename -a $WORLDS_NAME)
-  else
-    # no bukkit--retain previous functionality
-    WORLD_PARENT_DIR="$SERVER_WORLD"
-    WORLDS_NAME="$SERVER_WORLD"
-    TAR_ARGS="."
-  fi
   # Notify players of start
   message-players "Starting backup..." "$ARCHIVE_FILE_NAME"
 
@@ -507,10 +492,10 @@ do-backup () {
 
     case $COMPRESSION_ALGORITHM in
       # No compression
-      "") tar -cf "$ARCHIVE_PATH" -C "$WORLD_PARENT_DIR" $TAR_ARGS
+      "") tar -cf "$ARCHIVE_PATH" "${SERVER_WORLDS[@]}"
         ;;
       # With compression
-      *) tar -cf - -C "$WORLD_PARENT_DIR" $TAR_ARGS | $COMPRESSION_ALGORITHM -cv -"$COMPRESSION_LEVEL" - > "$ARCHIVE_PATH" 2>> /dev/null
+      *) tar -cf - "${SERVER_WORLDS[@]}" | $COMPRESSION_ALGORITHM -cv -"$COMPRESSION_LEVEL" - > "$ARCHIVE_PATH" 2>> /dev/null
         ;;
     esac
     EXIT_CODES=("${PIPESTATUS[@]}")
@@ -532,7 +517,7 @@ do-backup () {
 
   if [[ "$RESTIC_REPO" != "" ]]; then
     RESTIC_TIMESTAMP="${TIMESTAMP:0:10} ${TIMESTAMP:11:2}:${TIMESTAMP:14:2}:${TIMESTAMP:17:2}"
-    restic backup -r "$RESTIC_REPO" $WORLDS_NAME --time "$RESTIC_TIMESTAMP" "$QUIET"
+    restic backup -r "$RESTIC_REPO" "${SERVER_WORLDS[@]}" --time "$RESTIC_TIMESTAMP" "$QUIET"
     ARCHIVE_EXIT_CODE=$?
     if [ "$ARCHIVE_EXIT_CODE" -eq 3 ]; then
       log-warning "Incomplete snapshot taken (some files could not be read)"

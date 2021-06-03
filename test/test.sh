@@ -62,7 +62,7 @@ check-backup-full-paths () {
   WORLD_DIR="$2"
   mkdir -p "$TEST_TMP/restored"
   tar --extract --file "$BACKUP_ARCHIVE" --directory "$TEST_TMP/restored"
-  assert-equals-directory "$WORLD_DIR" "$TEST_TMP/restored"
+  assert-equals-directory "$WORLD_DIR" "$TEST_TMP/restored/$WORLD_DIR"
   rm -rf "$TEST_TMP/restored"
 }
 
@@ -79,6 +79,46 @@ check-latest-backup-restic () {
 }
 
 # Tests
+
+test-backup-defaults () {
+  TIMESTAMP="$(date +%F_%H-%M-%S --date="2021-01-01")"
+  ./backup.sh -i "$TEST_TMP/server/world" -o "$TEST_TMP/backups" -s "$SCREEN_TMP" -f "$TIMESTAMP"
+  check-backup "$TIMESTAMP.tar.gz"
+}
+
+test-backup-multiple-worlds () {
+  TIMESTAMP="$(date +%F_%H-%M-%S --date="2021-01-01")"
+  cp -r "$TEST_TMP/server/world" "$TEST_TMP/server/world_nether"
+  cp -r "$TEST_TMP/server/world" "$TEST_TMP/server/world_the_end"
+  ./backup.sh -i "$TEST_TMP/server/world" -i "$TEST_TMP/server/world_nether" -i "$TEST_TMP/server/world_the_end" -o "$TEST_TMP/backups" -s "$SCREEN_TMP" -f "$TIMESTAMP"
+  mkdir -p "$TEST_TMP/restored"
+  tar --extract --file "$TEST_TMP/backups/$TIMESTAMP.tar.gz" --directory "$TEST_TMP/restored"
+  assert-equals-directory "$TEST_TMP/server/world" "$TEST_TMP/restored/$TEST_TMP/server/world"
+  assert-equals-directory "$TEST_TMP/server/world_nether" "$TEST_TMP/restored/$TEST_TMP/server/world_nether"
+  assert-equals-directory "$TEST_TMP/server/world_the_end" "$TEST_TMP/restored/$TEST_TMP/server/world_the_end"
+}
+
+test-file-changed-as-read-warning () {
+  TIMESTAMP="$(date +%F_%H-%M-%S --date="2021-01-01")"
+  dd if=/dev/urandom of="$TEST_TMP/server/world/random" &
+  DD_PID="$!"
+  OUTPUT="$(./backup.sh -i "$TEST_TMP/server/world" -o "$TEST_TMP/backups" -s "$SCREEN_TMP" -f "$TIMESTAMP" 2>&1)"
+  EXIT_CODE="$?"
+  kill "$DD_PID"
+  assertEquals 0 "$EXIT_CODE"
+  assertContains "$OUTPUT" "Some files may differ in the backup archive"
+
+  # Check that the backup actually resulted in a valid tar 
+  assertTrue '[ -f '"$TEST_TMP/backups/$TIMESTAMP.tar.gz"' ]'
+
+  mkdir -p "$TEST_TMP/restored"
+  tar --extract --file "$TEST_TMP/backups/$TIMESTAMP.tar.gz" --directory "$TEST_TMP/restored"
+  assert-equals-directory "$WORLD_DIR/file1.txt" "$TEST_TMP/restored/$WORLD_DIR/file1.txt"
+  assert-equals-directory "$WORLD_DIR/file2.txt" "$TEST_TMP/restored/$WORLD_DIR/file2.txt"
+  assert-equals-directory "$WORLD_DIR/file3.txt" "$TEST_TMP/restored/$WORLD_DIR/file3.txt"
+}
+
+
 
 test-lock-defaults () {
   TIMESTAMP="$(date +%F_%H-%M-%S --date="2021-01-01")"
@@ -183,11 +223,6 @@ test-restic-defaults () {
   check-latest-backup-restic
 }
 
-test-backup-defaults () {
-  TIMESTAMP="$(date +%F_%H-%M-%S --date="2021-01-01")"
-  ./backup.sh -i "$TEST_TMP/server/world" -o "$TEST_TMP/backups" -s "$SCREEN_TMP" -f "$TIMESTAMP"
-  check-backup "$TIMESTAMP.tar.gz"
-}
 
 test-backup-spaces-in-directory () {
   TIMESTAMP="$(date +%F_%H-%M-%S --date="2021-01-01")"
@@ -291,26 +326,6 @@ test-nonzero-exit-warning () {
   assertNotEquals 0 "$EXIT_CODE"
   assertContains "$OUTPUT" "Archive command exited with nonzero exit code"
   assertFalse '[ -f '"$TEST_TMP/backups/$TIMESTAMP.tar.gz"' ]'
-}
-
-test-file-changed-as-read-warning () {
-  TIMESTAMP="$(date +%F_%H-%M-%S --date="2021-01-01")"
-  dd if=/dev/urandom of="$TEST_TMP/server/world/random" &
-  DD_PID="$!"
-  OUTPUT="$(./backup.sh -i "$TEST_TMP/server/world" -o "$TEST_TMP/backups" -s "$SCREEN_TMP" -f "$TIMESTAMP" 2>&1)"
-  EXIT_CODE="$?"
-  kill "$DD_PID"
-  assertEquals 0 "$EXIT_CODE"
-  assertContains "$OUTPUT" "Some files may differ in the backup archive"
-
-  # Check that the backup actually resulted in a valid tar 
-  assertTrue '[ -f '"$TEST_TMP/backups/$TIMESTAMP.tar.gz"' ]'
-
-  mkdir -p "$TEST_TMP/restored"
-  tar --extract --file "$TEST_TMP/backups/$TIMESTAMP.tar.gz" --directory "$TEST_TMP/restored"
-  assert-equals-directory "$WORLD_DIR/file1.txt" "$TEST_TMP/restored/file1.txt"
-  assert-equals-directory "$WORLD_DIR/file2.txt" "$TEST_TMP/restored/file2.txt"
-  assert-equals-directory "$WORLD_DIR/file3.txt" "$TEST_TMP/restored/file3.txt"
 }
 
 test-screen-interface () {

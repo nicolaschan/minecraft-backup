@@ -87,7 +87,7 @@ cd restored-world
 tar -xzvf /path/to/backups/2019-04-09_02-15-01.tar.gz
 ```
 
-Then you can move your restored world (`restored-world` in this case) to your Minecraft server folder and rename it (usually called `world`) so the Minecraft server uses it.
+The restored worlds should be inside the `restored-world` directory, possibly nested under the parent directories. Then you can move your restored world to your Minecraft server folder under the proper name and path so the Minecraft server uses it.
 
 ### With `restic`
 Use [`restic restore`](https://restic.readthedocs.io/en/latest/050_restore.html) to restore from backup.
