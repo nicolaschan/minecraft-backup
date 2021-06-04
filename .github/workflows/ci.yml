@@ -56,8 +56,10 @@ jobs:
           submodules: 'recursive'
       - name: Install shellcheck
         run: sudo apt-get install -y shellcheck 
-      - name: shellcheck
+      - name: shellcheck backup.sh
         run: shellcheck backup.sh
+      - name: shellcheck test.sh
+        run: shellcheck test/test.sh
   release:
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
