@@ -6,7 +6,9 @@ name: Docker
 on:
   push:
     branches:
-      - master
+    - master
+    tags:
+    - '*'
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
@@ -51,6 +53,12 @@ jobs:
       - name: Build the Docker image
         run: |
           echo ${{ secrets.CR_PAT }} | docker login ghcr.io -u $GITHUB_ACTOR --password-stdin
-          docker build . --file Dockerfile --tag ghcr.io/nicolaschan/minecraft-backup:$GITHUB_SHA --tag ghcr.io/nicolaschan/minecraft-backup:latest
-          docker push ghcr.io/nicolaschan/minecraft-backup:$GITHUB_SHA
+          docker build . --file Dockerfile --tag ghcr.io/nicolaschan/minecraft-backup:$GITHUB_REF --tag ghcr.io/nicolaschan/minecraft-backup:latest
+          docker push ghcr.io/nicolaschan/minecraft-backup:$GITHUB_REF
           docker push ghcr.io/nicolaschan/minecraft-backup:latest
+        
+      - name: Create Release
+        uses: ncipollo/release-action@v1.8.6
+        with:
+          artifacts: "backup.sh"
+          token: ${{ secrets.GITHUB_TOKEN }}
