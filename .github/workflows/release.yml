@@ -1,62 +1,43 @@
 # This is a basic workflow to help you get started with Actions
 
-name: Docker
+name: Release
 
 # Controls when the action will run. 
 on:
-  push:
-    tags:
-    - 'v*'
+  workflow_run:
+    workflows: ["CI"]
+    branches: [master]
+    types: [completed]
+    tags: ['v*']
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-  build:
-    # The type of runner that the job will run on
+  release:
     runs-on: ubuntu-latest
-
-    # Steps represent a sequence of tasks that will be executed as part of the job
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     steps:
-      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v2
         with:
           submodules: 'recursive'
-
-      - name: Install kcov and shellcheck
-        run: sudo apt-get install -y kcov shellcheck 
-
-      - name: Install restic
-        run: |
-          wget https://github.com/restic/restic/releases/download/v0.12.0/restic_0.12.0_linux_amd64.bz2
-          bzip2 -d restic_0.12.0_linux_amd64.bz2
-          sudo cp restic_0.12.0_linux_amd64 /usr/local/bin/restic
-          sudo chmod +x /usr/local/bin/restic
-
-      - name: Run tests
-        run: test/test.sh
-
-      - name: Run coverage
-        run: kcov --include-pattern=backup.sh "$(pwd)"/coverage test/test.sh
-        
-      - name: Codecov
-        uses: codecov/codecov-action@v1.2.1
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          file: ./coverage/test.sh/cov.xml
-
-      - name: shellcheck
-        run: shellcheck backup.sh
-
-      - name: Build the Docker image
-        run: |
-          echo ${{ secrets.CR_PAT }} | docker login ghcr.io -u $GITHUB_ACTOR --password-stdin
-          docker build . --file Dockerfile --tag ghcr.io/nicolaschan/minecraft-backup:${GITHUB_REF#refs/*/} --tag ghcr.io/nicolaschan/minecraft-backup:latest
-          docker push ghcr.io/nicolaschan/minecraft-backup:${GITHUB_REF#refs/*/}
-          docker push ghcr.io/nicolaschan/minecraft-backup:latest
-        
       - name: Create Release
         uses: ncipollo/release-action@v1.8.6
         with:
           artifacts: "backup.sh"
           token: ${{ secrets.GITHUB_TOKEN }}
+  docker:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: 'recursive'
+      - name: Build Docker image
+        run: |
+          docker build . --file Dockerfile --tag ghcr.io/nicolaschan/minecraft-backup:${GITHUB_REF#refs/*/} --tag ghcr.io/nicolaschan/minecraft-backup:latest
+      - name: Publish Docker image
+        run: |
+          echo ${{ secrets.CR_PAT }} | docker login ghcr.io -u $GITHUB_ACTOR --password-stdin
+          docker push ghcr.io/nicolaschan/minecraft-backup:${GITHUB_REF#refs/*/}
+          docker push ghcr.io/nicolaschan/minecraft-backup:latest
