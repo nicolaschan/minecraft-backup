@@ -9,7 +9,7 @@
 
 # Default Configuration 
 SCREEN_NAME="" # Name of the GNU Screen, tmux session, or hostname:port:password for RCON
-SERVER_WORLD="" # Server world directory
+SERVER_WORLDS=() # Server world directory
 BACKUP_DIRECTORY="" # Directory to save backups in
 MAX_BACKUPS=128 # -1 indicates unlimited
 DELETE_METHOD="thin" # Choices: thin, sequential, none; sequential: delete oldest; thin: keep last 24 hourly, last 30 daily, and monthly (use with 1 hr cron interval)
@@ -40,7 +40,7 @@ debug-log () {
   fi
 }
 
-while getopts 'a:cd:e:f:hi:l:m:o:p:qr:s:t:u:vw:' FLAG; do
+while getopts 'a:cd:e:f:hi:l:m:o:p:qr:s:t:u:vw:x' FLAG; do
   case $FLAG in
     a) COMPRESSION_ALGORITHM=$OPTARG ;;
     c) ENABLE_CHAT_MESSAGES=true ;;
@@ -55,7 +55,7 @@ while getopts 'a:cd:e:f:hi:l:m:o:p:qr:s:t:u:vw:' FLAG; do
        echo "-e    Compression file extension, exclude leading \".\" (default: gz)"
        echo "-f    Output file name (default is the timestamp)"
        echo "-h    Shows this help text"
-       echo "-i    Input directory (path to world folder)"
+       echo "-i    Input directory (path to world folder, use -i once for each world)"
        echo "-l    Compression level (default: 3)"
        echo "-m    Maximum backups to keep, use -1 for unlimited (default: 128)"
        echo "-o    Output directory"
@@ -67,9 +67,10 @@ while getopts 'a:cd:e:f:hi:l:m:o:p:qr:s:t:u:vw:' FLAG; do
        echo "-u    Lock file timeout seconds (empty = unlimited)"
        echo "-v    Verbose mode"
        echo "-w    Window manager: screen (default), tmux, RCON"
+       echo "-x    Bukkit-style server backup mode (world files are split by dimension)"
        exit 0
        ;;
-    i) SERVER_WORLD=$OPTARG ;;
+    i) SERVER_WORLDS+=("$OPTARG") ;;
     l) COMPRESSION_LEVEL=$OPTARG ;;
     m) MAX_BACKUPS=$OPTARG ;;
     o) BACKUP_DIRECTORY=$OPTARG ;;
@@ -216,7 +217,7 @@ if ! $SUPPRESS_WARNINGS; then
 fi
 # Check for required arguments
 MISSING_CONFIGURATION=false
-if [[ "$SERVER_WORLD" == "" ]]; then
+if [[ "${#SERVER_WORLDS[@]}" == "0" ]]; then
   log-fatal "Server world not specified (use -i)"
   MISSING_CONFIGURATION=true
 fi
@@ -442,7 +443,7 @@ clean-up () {
   TIME_DELTA=$((END_TIME - START_TIME))
 
   if [[ "$BACKUP_DIRECTORY" != "" ]]; then
-    WORLD_SIZE_BYTES=$(du -b --max-depth=0 "$SERVER_WORLD" | awk '{print $1}')
+    WORLD_SIZE_BYTES=$(du --bytes --total --max-depth=0 "${SERVER_WORLDS[@]}" | tail -n 1 | awk '{print $1}')
     ARCHIVE_SIZE_BYTES=$(du -b "$ARCHIVE_PATH" | awk '{print $1}')
     ARCHIVE_SIZE=$(du -h "$ARCHIVE_PATH" | awk '{print $1}')
     BACKUP_DIRECTORY_SIZE=$(du -h --max-depth=0 "$BACKUP_DIRECTORY" | awk '{print $1}')
@@ -491,10 +492,10 @@ do-backup () {
 
     case $COMPRESSION_ALGORITHM in
       # No compression
-      "") tar -cf "$ARCHIVE_PATH" -C "$SERVER_WORLD" .
+      "") tar -cf "$ARCHIVE_PATH" "${SERVER_WORLDS[@]}"
         ;;
       # With compression
-      *) tar -cf - -C "$SERVER_WORLD" . | $COMPRESSION_ALGORITHM -cv -"$COMPRESSION_LEVEL" - > "$ARCHIVE_PATH" 2>> /dev/null
+      *) tar -cf - "${SERVER_WORLDS[@]}" | $COMPRESSION_ALGORITHM -cv -"$COMPRESSION_LEVEL" - > "$ARCHIVE_PATH" 2>> /dev/null
         ;;
     esac
     EXIT_CODES=("${PIPESTATUS[@]}")
@@ -516,7 +517,7 @@ do-backup () {
 
   if [[ "$RESTIC_REPO" != "" ]]; then
     RESTIC_TIMESTAMP="${TIMESTAMP:0:10} ${TIMESTAMP:11:2}:${TIMESTAMP:14:2}:${TIMESTAMP:17:2}"
-    restic backup -r "$RESTIC_REPO" "$SERVER_WORLD" --time "$RESTIC_TIMESTAMP" "$QUIET"
+    restic backup -r "$RESTIC_REPO" "${SERVER_WORLDS[@]}" --time "$RESTIC_TIMESTAMP" "$QUIET"
     ARCHIVE_EXIT_CODE=$?
     if [ "$ARCHIVE_EXIT_CODE" -eq 3 ]; then
       log-warning "Incomplete snapshot taken (some files could not be read)"
