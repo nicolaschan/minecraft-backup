@@ -58,3 +58,33 @@ jobs:
         run: sudo apt-get install -y shellcheck 
       - name: shellcheck
         run: shellcheck backup.sh
+  release:
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [test, coverage, shellcheck]
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: 'recursive'
+      - name: Create release
+        uses: ncipollo/release-action@v1.8.6
+        with:
+          artifacts: "backup.sh"
+          token: ${{ secrets.GITHUB_TOKEN }}
+  docker:
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [test, coverage, shellcheck]
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: 'recursive'
+      - name: Build Docker image
+        run: |
+          docker build . --file Dockerfile --tag ghcr.io/nicolaschan/minecraft-backup:${GITHUB_REF#refs/*/} --tag ghcr.io/nicolaschan/minecraft-backup:latest
+      - name: Publish Docker image
+        run: |
+          echo ${{ secrets.CR_PAT }} | docker login ghcr.io -u $GITHUB_ACTOR --password-stdin
+          docker push ghcr.io/nicolaschan/minecraft-backup:${GITHUB_REF#refs/*/}
+          docker push ghcr.io/nicolaschan/minecraft-backup:latest
+
