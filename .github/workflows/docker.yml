@@ -5,8 +5,6 @@ name: Docker
 # Controls when the action will run. 
 on:
   push:
-    branches:
-    - master
     tags:
     - 'v*'
   # Allows you to run this workflow manually from the Actions tab
