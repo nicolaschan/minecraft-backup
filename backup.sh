@@ -240,8 +240,13 @@ if $MISSING_CONFIGURATION; then
   exit 1
 fi
 
-ARCHIVE_FILE_NAME="$TIMESTAMP.tar$COMPRESSION_FILE_EXTENSION"
-ARCHIVE_PATH="$BACKUP_DIRECTORY/$ARCHIVE_FILE_NAME"
+if [[ "$BACKUP_DIRECTORY" != "" ]]; then
+  ARCHIVE_FILE_NAME="$TIMESTAMP.tar$COMPRESSION_FILE_EXTENSION"
+  ARCHIVE_PATH="$BACKUP_DIRECTORY/$ARCHIVE_FILE_NAME"
+fi
+if [[ "$RESTIC_REPO" != "" ]]; then
+  ARCHIVE_PATH="$RESTIC_REPO $TIMESTAMP"
+fi
 
 # Minecraft server screen interface functions
 message-players () {
@@ -478,7 +483,7 @@ trap "clean-up" 2
 
 do-backup () {
   # Notify players of start
-  message-players "Starting backup..." "$ARCHIVE_FILE_NAME"
+  message-players "Starting backup..." "$ARCHIVE_PATH"
 
   # Disable world autosaving
   execute-command "save-off"
