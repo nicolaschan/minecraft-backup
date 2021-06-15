@@ -56,6 +56,7 @@ Command line options:
 -e    Compression file extension, exclude leading "." (default: gz)
 -f    Output file name (default is the timestamp)
 -h    Shows this help text
+-H    Set hostname for restic backup (restic only)
 -i    Input directory (path to world folder, use -i once for each world)
 -l    Compression level (default: 3)
 -m    Maximum backups to keep, use -1 for unlimited (default: 128)

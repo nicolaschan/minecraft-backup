@@ -80,6 +80,24 @@ check-latest-backup-restic () {
 
 # Tests
 
+test-restic-explicit-hostname () {
+  EXPECTED_HOSTNAME="${HOSTNAME}blahblah"
+  TIMESTAMP="$(date +%F_%H-%M-%S --date="2021-01-01")"
+  ./backup.sh -i "$TEST_TMP/server/world" -r "$TEST_TMP/backups-restic" -s "$SCREEN_TMP" -f "$TIMESTAMP" -H "$EXPECTED_HOSTNAME"
+  check-latest-backup-restic
+  LATEST_BACKUP_HOSTNAME=$(restic -r "$TEST_TMP/backups-restic" snapshots latest --json | jq -r '.[0]["hostname"]')
+  assertEquals "$EXPECTED_HOSTNAME" "$LATEST_BACKUP_HOSTNAME"
+}
+
+test-restic-default-hostname () {
+  EXPECTED_HOSTNAME="${HOSTNAME}"
+  TIMESTAMP="$(date +%F_%H-%M-%S --date="2021-01-01")"
+  ./backup.sh -i "$TEST_TMP/server/world" -r "$TEST_TMP/backups-restic" -s "$SCREEN_TMP" -f "$TIMESTAMP"
+  check-latest-backup-restic
+  LATEST_BACKUP_HOSTNAME=$(restic -r "$TEST_TMP/backups-restic" snapshots latest --json | jq -r '.[0]["hostname"]')
+  assertEquals "$EXPECTED_HOSTNAME" "$LATEST_BACKUP_HOSTNAME"
+}
+
 test-backup-defaults () {
   TIMESTAMP="$(date +%F_%H-%M-%S --date="2021-01-01")"
   ./backup.sh -i "$TEST_TMP/server/world" -o "$TEST_TMP/backups" -s "$SCREEN_TMP" -f "$TIMESTAMP"

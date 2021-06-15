@@ -20,6 +20,7 @@ ENABLE_CHAT_MESSAGES=false # Tell players in Minecraft chat about backup status
 PREFIX="Backup" # Shows in the chat message
 DEBUG=false # Enable debug messages
 SUPPRESS_WARNINGS=false # Suppress warnings
+RESTIC_HOSTNAME="" # Leave empty to use system hostname
 LOCK_FILE="" # Optional lock file to acquire to ensure two backups don't run at once
 LOCK_FILE_TIMEOUT="" # Optional lock file wait timeout (in seconds)
 WINDOW_MANAGER="screen" # Choices: screen, tmux, RCON
@@ -40,7 +41,7 @@ debug-log () {
   fi
 }
 
-while getopts 'a:cd:e:f:hi:l:m:o:p:qr:s:t:u:vw:x' FLAG; do
+while getopts 'a:cd:e:f:hH:i:l:m:o:p:qr:s:t:u:vw:x' FLAG; do
   case $FLAG in
     a) COMPRESSION_ALGORITHM=$OPTARG ;;
     c) ENABLE_CHAT_MESSAGES=true ;;
@@ -55,6 +56,7 @@ while getopts 'a:cd:e:f:hi:l:m:o:p:qr:s:t:u:vw:x' FLAG; do
        echo "-e    Compression file extension, exclude leading \".\" (default: gz)"
        echo "-f    Output file name (default is the timestamp)"
        echo "-h    Shows this help text"
+       echo "-H    Set hostname for restic backup (restic only)"
        echo "-i    Input directory (path to world folder, use -i once for each world)"
        echo "-l    Compression level (default: 3)"
        echo "-m    Maximum backups to keep, use -1 for unlimited (default: 128)"
@@ -67,9 +69,9 @@ while getopts 'a:cd:e:f:hi:l:m:o:p:qr:s:t:u:vw:x' FLAG; do
        echo "-u    Lock file timeout seconds (empty = unlimited)"
        echo "-v    Verbose mode"
        echo "-w    Window manager: screen (default), tmux, RCON"
-       echo "-x    Bukkit-style server backup mode (world files are split by dimension)"
        exit 0
        ;;
+    H) RESTIC_HOSTNAME=$OPTARG ;;
     i) SERVER_WORLDS+=("$OPTARG") ;;
     l) COMPRESSION_LEVEL=$OPTARG ;;
     m) MAX_BACKUPS=$OPTARG ;;
@@ -522,7 +524,12 @@ do-backup () {
 
   if [[ "$RESTIC_REPO" != "" ]]; then
     RESTIC_TIMESTAMP="${TIMESTAMP:0:10} ${TIMESTAMP:11:2}:${TIMESTAMP:14:2}:${TIMESTAMP:17:2}"
-    restic backup -r "$RESTIC_REPO" "${SERVER_WORLDS[@]}" --time "$RESTIC_TIMESTAMP" "$QUIET"
+    if [[ "$RESTIC_HOSTNAME" == "" ]]; then
+      RESTIC_HOSTNAME_OPTION=()
+    else
+      RESTIC_HOSTNAME_OPTION=("--host" "$RESTIC_HOSTNAME")
+    fi
+    restic backup -r "$RESTIC_REPO" "${SERVER_WORLDS[@]}" --time "$RESTIC_TIMESTAMP" "$QUIET" "${RESTIC_HOSTNAME_OPTION[@]}"
     ARCHIVE_EXIT_CODE=$?
     if [ "$ARCHIVE_EXIT_CODE" -eq 3 ]; then
       log-warning "Incomplete snapshot taken (some files could not be read)"
