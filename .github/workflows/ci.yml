@@ -98,5 +98,5 @@ jobs:
           --pull \
           --push \
           --platform linux/386,linux/amd64,linux/arm/v6,linux/arm/v7,linux/arm64 \
-          --tag ghcr.io/nicolaschan/minecraft-backup:${GITHUB_REF#refs/*/}
+          --tag ghcr.io/nicolaschan/minecraft-backup:${GITHUB_REF#refs/*/} \
           --tag ghcr.io/nicolaschan/minecraft-backup:latest .
