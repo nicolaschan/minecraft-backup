@@ -268,7 +268,6 @@ execute-command () {
         ;;
       "docker-rcon") docker exec "$SCREEN_NAME" rcon-cli "$COMMAND"
         ;;
-
     esac
   fi
 }
