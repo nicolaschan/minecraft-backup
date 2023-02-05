@@ -44,6 +44,9 @@ docker run \
   -v /home/user/server/world:/mnt/server \
   -v /mnt/storage/backups:/mnt/backups \
   ghcr.io/nicolaschan/minecraft-backup -c -i /mnt/server -o /mnt/backups -s server-host:25575:secret -w rcon
+  
+# Using itzg/docker-minecraft-server container and rcon cli
+./backup.sh -c -i /home/user/server/world -o /mnt/storage/backups -s container-name -w docker-rcon
 ```
 
 This will show chat messages (`-c`) and save a backup of `/home/user/server/world` into `/mnt/storage/backups` using the default thinning deletion policy for old backups.
@@ -64,7 +67,7 @@ Command line options:
 -p    Prefix that shows in Minecraft chat (default: Backup)
 -q    Suppress warnings
 -r    Restic repo name (if using restic)
--s    Screen name, tmux session name, or hostname:port:password for RCON
+-s    Screen name, tmux session name, hostname:port:password for RCON or [container name](https://github.com/itzg/docker-minecraft-server) for docker-rcon
 -t    Enable lock file (lock file not used by default)
 -u    Lock file timeout seconds (empty = unlimited)
 -v    Verbose mode
