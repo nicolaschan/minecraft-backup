@@ -50,7 +50,7 @@ assert-equals-directory () {
   fi
   if [ -d "$1" ]; then
     for FILE in "$1"/*; do
-      assert-equals-directory "$FILE" "$2/${FILE##$1}"
+      assert-equals-directory "$FILE" "$2/${FILE##"$1"}"
     done
   else
     assertEquals "$(cat "$1")" "$(cat "$2")"
