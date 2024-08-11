@@ -136,8 +136,6 @@ test-file-changed-as-read-warning () {
   assert-equals-directory "$WORLD_DIR/file3.txt" "$TEST_TMP/restored/$WORLD_DIR/file3.txt"
 }
 
-
-
 test-lock-defaults () {
   TIMESTAMP="$(date +%F_%H-%M-%S --date="2021-01-01")"
   ./backup.sh -t "$TEST_TMP/lockfile" -i "$TEST_TMP/server/world" -o "$TEST_TMP/backups" -s "$SCREEN_TMP" -f "$TIMESTAMP"
@@ -240,7 +238,6 @@ test-restic-defaults () {
   ./backup.sh -i "$TEST_TMP/server/world" -r "$TEST_TMP/backups-restic" -s "$SCREEN_TMP" -f "$TIMESTAMP"
   check-latest-backup-restic
 }
-
 
 test-backup-spaces-in-directory () {
   TIMESTAMP="$(date +%F_%H-%M-%S --date="2021-01-01")"
@@ -473,6 +470,7 @@ test-restic-thinning-delete () {
   done
   EXPECTED_TIMESTAMPS=(
     # Weekly
+    "2021-01-01 00:00:00"
 
     # Daily (30)
     "2021-01-01 23:00:00"
@@ -512,11 +510,14 @@ test-restic-thinning-delete () {
     assertContains "$SNAPSHOTS" "$TIMESTAMP" 
   done
   UNEXPECTED_TIMESTAMPS=(
-    "2021-01-01 00:00:00"
+    "2021-01-01 01:00:00"
+    "2021-01-01 02:00:00"
     "2021-01-02 22:00:00"
+    "2021-01-03 22:00:00"
+    "2021-01-04 00:00:00"
   )
   for TIMESTAMP in "${UNEXPECTED_TIMESTAMPS[@]}"; do
-    assertNotContains "$SNAPSHOTS" "$TIMESTAMP" 
+    assertNotContains "$SNAPSHOTS" "$TIMESTAMP"
   done
 }
 
