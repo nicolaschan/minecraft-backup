@@ -379,6 +379,20 @@ test-rcon-interface-not-running () {
   assertContains "$OUTPUT" "Could not connect"
 }
 
+test-docker-rcon () {
+  CONTAINER="$(docker run -d -e EULA=TRUE docker.io/itzg/minecraft-server)"
+  while ! docker exec "$CONTAINER" grep 'RCON running on 0.0.0.0:25575' /data/logs/latest.log; do
+    sleep 0.1
+  done
+  TIMESTAMP="$(date +%F_%H-%M-%S --date="2021-01-01")"
+  ./backup.sh -w docker-rcon -i "$TEST_TMP/server/world" -o "$TEST_TMP/backups" -s "$CONTAINER" -f "$TIMESTAMP"
+  OUTPUT="$(docker exec "$CONTAINER" cat /data/logs/latest.log)"
+  docker rm -f "$CONTAINER"
+  assertContains "$OUTPUT" "[Rcon: Automatic saving is now disabled]"
+  assertContains "$OUTPUT" "[Rcon: Automatic saving is now enabled]"
+  assertContains "$OUTPUT" "[Rcon: Saved the game]"
+}
+
 test-sequential-delete () {
   for i in $(seq 0 20); do
     TIMESTAMP="$(date +%F_%H-%M-%S --date="2021-01-01 +$i hour")"
