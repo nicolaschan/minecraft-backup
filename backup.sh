@@ -24,6 +24,7 @@ RESTIC_HOSTNAME="" # Leave empty to use system hostname
 LOCK_FILE="" # Optional lock file to acquire to ensure two backups don't run at once
 LOCK_FILE_TIMEOUT="" # Optional lock file wait timeout (in seconds)
 WINDOW_MANAGER="screen" # Choices: screen, tmux, RCON
+TMUX_SOCKET="" # if -L is set will be defined as the tmux socket used
 
 # Other Variables (do not modify)
 DATE_FORMAT="%F_%H-%M-%S"
@@ -59,6 +60,7 @@ while getopts 'a:cd:e:f:hH:i:l:m:o:p:qr:s:t:u:vw:x' FLAG; do
        echo "-H    Set hostname for restic backup (restic only)"
        echo "-i    Input directory (path to world folder, use -i once for each world)"
        echo "-l    Compression level (default: 3)"
+       echo "-L    tmux socket name"
        echo "-m    Maximum backups to keep, use -1 for unlimited (default: 128)"
        echo "-o    Output directory"
        echo "-p    Prefix that shows in Minecraft chat (default: Backup)"
@@ -74,6 +76,7 @@ while getopts 'a:cd:e:f:hH:i:l:m:o:p:qr:s:t:u:vw:x' FLAG; do
     H) RESTIC_HOSTNAME=$OPTARG ;;
     i) SERVER_WORLDS+=("$OPTARG") ;;
     l) COMPRESSION_LEVEL=$OPTARG ;;
+    L) TMUX_SOCKET=$OPTARG ;;
     m) MAX_BACKUPS=$OPTARG ;;
     o) BACKUP_DIRECTORY=$OPTARG ;;
     p) PREFIX=$OPTARG ;;
@@ -262,7 +265,13 @@ execute-command () {
     case $WINDOW_MANAGER in
       "screen") screen -S "$SCREEN_NAME" -p 0 -X stuff "$COMMAND$(printf \\r)"
         ;;
-      "tmux") tmux send-keys -t "$SCREEN_NAME" "$COMMAND" ENTER
+      "tmux") 
+              if [[ $TMUX_SOCKET != "" ]]; then
+                  tmux -L "$TMUX_SOCKET" send-keys -t "$SCREEN_NAME" "$COMMAND" ENTER
+              else
+                  tmux send-keys -t "$SCREEN_NAME" "$COMMAND" ENTER      
+              fi
+
         ;;
       "RCON"|"rcon") rcon-command "$SCREEN_NAME" "$COMMAND"
         ;;
