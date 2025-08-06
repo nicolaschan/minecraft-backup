@@ -490,7 +490,7 @@ do-backup () {
   message-players "Starting backup..." "$ARCHIVE_PATH"
 
   # Trigger save now to get most up-to-date data
-  execute-command "save-all"
+  execute-command "save-all flush"
 
   # Disable world autosaving
   execute-command "save-off"
