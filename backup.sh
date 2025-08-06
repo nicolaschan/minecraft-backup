@@ -489,6 +489,9 @@ do-backup () {
   # Notify players of start
   message-players "Starting backup..." "$ARCHIVE_PATH"
 
+  # Trigger save now to get most up-to-date data
+  execute-command "save-all"
+
   # Disable world autosaving
   execute-command "save-off"
 
