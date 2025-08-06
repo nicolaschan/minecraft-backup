@@ -24,6 +24,7 @@ RESTIC_HOSTNAME="" # Leave empty to use system hostname
 LOCK_FILE="" # Optional lock file to acquire to ensure two backups don't run at once
 LOCK_FILE_TIMEOUT="" # Optional lock file wait timeout (in seconds)
 WINDOW_MANAGER="screen" # Choices: screen, tmux, RCON
+SAVE_ALL_WAIT_SECONDS="" # Delay in seconds after save-all flush (default: 5, 0 if rcon)
 
 # Other Variables (do not modify)
 DATE_FORMAT="%F_%H-%M-%S"
@@ -41,7 +42,7 @@ debug-log () {
   fi
 }
 
-while getopts 'a:cd:e:f:hH:i:l:m:o:p:qr:s:t:u:vw:x' FLAG; do
+while getopts 'a:cd:e:f:hH:i:l:m:o:p:qr:s:t:u:vw:xz:' FLAG; do
   case $FLAG in
     a) COMPRESSION_ALGORITHM=$OPTARG ;;
     c) ENABLE_CHAT_MESSAGES=true ;;
@@ -69,6 +70,7 @@ while getopts 'a:cd:e:f:hH:i:l:m:o:p:qr:s:t:u:vw:x' FLAG; do
        echo "-u    Lock file timeout seconds (empty = unlimited)"
        echo "-v    Verbose mode"
        echo "-w    Window manager: screen (default), tmux, RCON"
+       echo "-z    Delay in seconds after save-all flush (default: 5, 0 if rcon)"
        exit 0
        ;;
     H) RESTIC_HOSTNAME=$OPTARG ;;
@@ -84,6 +86,7 @@ while getopts 'a:cd:e:f:hH:i:l:m:o:p:qr:s:t:u:vw:x' FLAG; do
     u) LOCK_FILE_TIMEOUT=$OPTARG ;;
     v) DEBUG=true ;;
     w) WINDOW_MANAGER=$OPTARG ;;
+    z) SAVE_ALL_WAIT_SECONDS=$OPTARG ;;
     *) log-fatal "Invalid option -$FLAG"; exit 1 ;;
   esac
 done
@@ -290,6 +293,25 @@ message-players-color () {
     execute-command "tellraw @a [\"\",{\"text\":\"[$PREFIX] \",\"color\":\"gray\",\"italic\":true},{\"text\":\"$MESSAGE\",\"color\":\"$COLOR\",\"italic\":true,\"hoverEvent\":{\"action\":\"show_text\",\"value\":{\"text\":\"\",\"extra\":[{\"text\":\"$HOVER_MESSAGE\"}]}}}]"
   fi
 }
+save-all-flush-delay-seconds () {
+  if [[ -n "$SAVE_ALL_WAIT_SECONDS" ]]; then
+    echo "$SAVE_ALL_WAIT_SECONDS"
+    return
+  fi
+
+  case "$WINDOW_MANAGER" in
+    # RCON already waits for response
+    "RCON"|"rcon"|"docker-rcon") echo "0"
+      ;;
+    *) echo "5" # default value for all other cases
+      ;;
+  esac
+}
+execute-save-all-flush () {
+  execute-command "save-all" # for versions <1.16
+  execute-command "save-all flush"
+  sleep "$(save-all-flush-delay-seconds)"
+}
 
 # Parse file timestamp to one readable by "date" 
 parse-file-timestamp () {
@@ -489,11 +511,11 @@ do-backup () {
   # Notify players of start
   message-players "Starting backup..." "$ARCHIVE_PATH"
 
-  # Trigger save now to get most up-to-date data
-  execute-command "save-all flush"
-
-  # Disable world autosaving
+  # Disable world autosaving, still allows save-all
   execute-command "save-off"
+
+  # Trigger save now to get most up-to-date data
+  execute-save-all-flush
 
   # Backup world
   START_TIME=$(date +"%s")

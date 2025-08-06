@@ -346,7 +346,7 @@ test-nonzero-exit-warning () {
 test-screen-interface () {
   TIMESTAMP="$(date +%F_%H-%M-%S --date="2021-01-01")"
   ./backup.sh -i "$TEST_TMP/server/world" -o "$TEST_TMP/backups" -s "$SCREEN_TMP" -f "$TIMESTAMP"
-  EXPECTED_CONTENTS=$(echo -e "save-all flush\nsave-off\nsave-on\nsave-all") 
+  EXPECTED_CONTENTS=$(echo -e "save-off\nsave-all\nsave-all flush\nsave-on\nsave-all") 
   SCREEN_CONTENTS="$(cat "$TEST_TMP/screen-output")"
   assertEquals "$EXPECTED_CONTENTS" "$SCREEN_CONTENTS" 
 }
@@ -354,7 +354,7 @@ test-screen-interface () {
 test-tmux-interface () {
   TIMESTAMP="$(date +%F_%H-%M-%S --date="2021-01-01")"
   ./backup.sh -w tmux -i "$TEST_TMP/server/world" -o "$TEST_TMP/backups" -s "$SCREEN_TMP" -f "$TIMESTAMP"
-  EXPECTED_CONTENTS=$(echo -e "save-all flush\nsave-off\nsave-on\nsave-all") 
+  EXPECTED_CONTENTS=$(echo -e "save-off\nsave-all\nsave-all flush\nsave-on\nsave-all") 
   SCREEN_CONTENTS="$(cat "$TEST_TMP/tmux-output")"
   assertEquals "$EXPECTED_CONTENTS" "$SCREEN_CONTENTS" 
 }
@@ -362,8 +362,8 @@ test-tmux-interface () {
 test-rcon-interface () {
   TIMESTAMP="$(date +%F_%H-%M-%S --date="2021-01-01")"
   ./backup.sh -w rcon -i "$TEST_TMP/server/world" -o "$TEST_TMP/backups" -s "localhost:$RCON_PORT:$RCON_PASSWORD" -f "$TIMESTAMP"
-  EXPECTED_CONTENTS=$(echo -e "save-all flush\nsave-off\nsave-on\nsave-all") 
-  SCREEN_CONTENTS="$(head -n4 "$TEST_TMP/rcon-output")"
+  EXPECTED_CONTENTS=$(echo -e "save-off\nsave-all\nsave-all flush\nsave-on\nsave-all") 
+  SCREEN_CONTENTS="$(head -n5 "$TEST_TMP/rcon-output")"
   assertEquals "$EXPECTED_CONTENTS" "$SCREEN_CONTENTS" 
 }
 

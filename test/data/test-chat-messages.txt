@@ -1,6 +1,7 @@
 tellraw @a ["",{"text":"[Backup] ","color":"gray","italic":true},{"text":"Starting backup...","color":"gray","italic":true,"hoverEvent":{"action":"show_text","value":{"text":"","extra":[{"text":"test/tmp/backups/2021-01-01_00-00-00.tar.gz"}]}}}]
-save-all flush
 save-off
+save-all
+save-all flush
 save-on
 save-all
 tellraw @a ["",{"text":"[Backup] ","color":"gray","italic":true},{"text":"Backup complete!","color":"green","italic":true,"hoverEvent":{"action":"show_text","value":{"text":"","extra":[{"text":"0 s, 4.0K/4.0K, 316%"}]}}}]
