@@ -24,7 +24,7 @@ If using RCON, you will also need to have the [`xxd`](https://linux.die.net/man/
 
 ## Usage
 ```bash
-# If connecting with RCON:
+# If connecting with RCON (preferred method):
 ./backup.sh -c -i /home/user/server/world -o /mnt/storage/backups -s localhost:25575:secret -w rcon
 
 # If running on screen called "minecraft":
@@ -72,6 +72,7 @@ Command line options:
 -u    Lock file timeout seconds (empty = unlimited)
 -v    Verbose mode
 -w    Window manager: screen (default), tmux, RCON
+-z    Delay in seconds after save-all flush (default: 5, 0 if rcon) (Please see "Consistency Warning" below)
 ```
 
 ### Automate backups with cron
@@ -103,6 +104,32 @@ tar: /some/path/here/world/region/r.1.11.mca: file changed as we read it
 ```
 To fix this problem, the backup script disables autosaving with the `save-off` Minecraft command before running `tar` and then re-enables autosaving after `tar` is done. 
 
+## Known Issues
+
+### Consistency Warning
+
+Player data may become out of sync with world data during backups. Player data saves on events like disconnects, inventory changes, and position updates - these saves continue even after `save-off`. This could cause player inventory to not match world contents, possibly resulting in duplicated or lost items.
+
+This script minimizes but cannot eliminate this risk without freezing players. The backup process works as follows:
+
+1. `save-off` - Disables automatic world saves (but not event-driven player saves)
+2. `save-all` - Saves all world and player data 
+3. `save-all flush` - Forces writes to disk (Minecraft 1.16+ only, harmless on older versions)
+4. **Wait period** - Behavior depends on connection method (`-w` option):
+   - **Screen/tmux**: Waits according to `-z` option (default: 5 seconds)
+     - Too short: Risk corrupted backup from incomplete writes
+     - Too long: Larger window for player/world desync
+     - Tune based on your server's typical save time
+   - **RCON**: Waits for server to confirm save completion (safest option)
+5. **Backup runs**
+6. `save-on` - Re-enables automatic world saves
+
+**Recommendation**: Use RCON if possible for the safest backups. For screen/tmux, monitor your server's typical `save-all flush` completion time and set `-z` accordingly.
+
+### Bug MC-217729
+
+There is a Minecraft bug [MC-217729](https://bugs.mojang.com/projects/MC/issues/MC-217729) in recent Minecraft server versions that cause them to automatically save the world even after receiving the `save-off` command. Until this is fixed, there is a chance that the backup will fail because the world files are modified by Minecraft in the process of creating the backup. This script will try to detect and report this problem if it does occur.
+
 ## Help
 - Make sure the compression algorithm you specify is installed on your system. (zstd is not installed by default)
 - Make sure your compression algorithm is in the crontab's PATH
@@ -110,9 +137,6 @@ To fix this problem, the backup script disables autosaving with the `save-off` M
 - It's surprising how much space backups can take--make sure you have enough empty space
 - Do not put trailing `/` in the `SERVER_DIRECTORY` or `BACKUP_DIRECTORY`
 - If "thin" delete method is behaving weirdly, try emptying your backup directory or switch to "sequential"
-
-## Known Issues
-There is a Minecraft bug [MC-217729](https://bugs.mojang.com/projects/MC/issues/MC-217729) in recent Minecraft server versions that cause them to automatically save the world even after receiving the `save-off` command. Until this is fixed, there is a chance that the backup will fail because the world files are modified by Minecraft in the process of creating the backup. This script will try to detect and report this problem if it does occur.
 
 ## Disclaimer
 Backups are essential to the integrity of your Minecraft world. You should automate regular backups and **check that your backups work**. It is up to you to make sure that your backups work and that you have a reliable backup policy. 
